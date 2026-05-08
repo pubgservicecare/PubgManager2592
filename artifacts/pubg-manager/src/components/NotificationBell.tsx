@@ -14,7 +14,7 @@ interface Notif {
 }
 
 export function NotificationBell() {
-  const { customer } = useCustomerAuth();
+  const { customer, refresh } = useCustomerAuth();
   const [, setLocation] = useLocation();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Notif[]>([]);
@@ -30,7 +30,10 @@ export function NotificationBell() {
     const fetchUnread = async () => {
       try {
         const r = await fetch("/api/customer/notifications/unread-count", { credentials: "include" });
-        if (!r.ok) return;
+        if (!r.ok) {
+          if (r.status === 401) refresh();
+          return;
+        }
         const data = await r.json();
         if (!cancelled) setUnread(data.count ?? 0);
       } catch {}

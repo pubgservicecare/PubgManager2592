@@ -154,7 +154,7 @@ router.post("/admin/sellers/:id/suspend", requireAdmin, async (req, res): Promis
   const id = parseInt(req.params.id as string, 10);
   const { reason } = req.body;
   const adminUser = (req.session as any).username || "admin";
-  const result = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx: any) => {
     const [updatedSeller] = await tx.update(sellersTable).set({
       status: "suspended",
       rejectionReason: reason || "Suspended by admin",
@@ -203,7 +203,7 @@ router.post("/admin/sellers/:id/reinstate", requireAdmin, async (req, res): Prom
 router.delete("/admin/sellers/:id", requireAdmin, async (req, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   const adminUser = (req.session as any).username || "admin";
-  const result = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx: any) => {
     // Confirm seller exists first so a 404 has no side effects on listings.
     const [existing] = await tx.select({ id: sellersTable.id }).from(sellersTable).where(eq(sellersTable.id, id));
     if (!existing) return { seller: null as any, deletedCount: 0 };

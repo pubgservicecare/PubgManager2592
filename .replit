@@ -20,10 +20,6 @@ author = "agent"
 task = "workflow.run"
 args = "API Server"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "PUBG Manager"
-
 [[workflows.workflow]]
 name = "API Server"
 author = "agent"
@@ -35,18 +31,6 @@ outputType = "console"
 task = "shell.exec"
 args = "PORT=8080 pnpm --filter @workspace/api-server run dev"
 waitForPort = 8080
-
-[[workflows.workflow]]
-name = "PUBG Manager"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm --filter @workspace/pubg-manager run dev"
-waitForPort = 21604
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [agent]
 stack = "PNPM_WORKSPACE"

@@ -109,7 +109,7 @@ router.patch("/settings", requireAdmin, async (req, res): Promise<void> => {
     "storageProvider",
   ];
   for (const k of requiredText) {
-    if (updates[k] === null) delete updates[k];
+    if (updates[k as string] === null) delete updates[k as string];
   }
 
   const { eq } = await import("drizzle-orm");

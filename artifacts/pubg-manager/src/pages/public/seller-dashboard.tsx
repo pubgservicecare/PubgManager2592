@@ -490,6 +490,16 @@ export function SellerDashboard() {
         </div>
       </div>
 
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title="Logout"
+        message="Kya aap waqai logout karna chahte hain?"
+        confirmLabel="Yes, Logout"
+        cancelLabel="Cancel"
+        busyLabel="Logging out..."
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </PublicLayout>
   );
 }
@@ -1061,16 +1071,5 @@ function AdminChatPanel({
         )}
       </AnimatePresence>
     </motion.div>
-
-    <ConfirmDialog
-      open={showLogoutConfirm}
-      title="Logout"
-      message="Kya aap waqai logout karna chahte hain?"
-      confirmLabel="Yes, Logout"
-      cancelLabel="Cancel"
-      busyLabel="Logging out..."
-      onConfirm={handleLogout}
-      onCancel={() => setShowLogoutConfirm(false)}
-    />
   );
 }
