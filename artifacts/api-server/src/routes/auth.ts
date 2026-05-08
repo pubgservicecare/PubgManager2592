@@ -19,12 +19,6 @@ router.post("/auth/admin/login", async (req, res): Promise<void> => {
 
   const [settings] = await db.select().from(settingsTable).limit(1);
   if (!settings) {
-    if (username === "admin" && password === "admin123") {
-      req.session.isAdmin = true;
-      req.session.username = "admin";
-      res.json({ success: true, username: "admin" });
-      return;
-    }
     res.status(401).json({ error: "Invalid credentials" });
     return;
   }

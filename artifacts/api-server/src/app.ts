@@ -45,7 +45,11 @@ app.use(
       pool,
       tableName: "user_sessions",
     }),
-    secret: process.env.SESSION_SECRET || "pubg-manager-secret-key",
+    secret: (() => {
+      const s = process.env.SESSION_SECRET;
+      if (!s) throw new Error("SESSION_SECRET environment variable is required but was not provided.");
+      return s;
+    })(),
     resave: false,
     saveUninitialized: false,
     cookie: {
