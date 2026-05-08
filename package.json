@@ -1,6 +1,5 @@
 {
   "name": "workspace",
-  "homepage": "https://codexstock.github.io/CODEXSTOCK/",
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
@@ -13,11 +12,5 @@
   "devDependencies": {
     "typescript": "~5.9.2",
     "prettier": "^3.8.1"
-  },
-  "pnpm": {
-    "overrides": {
-      "react": "catalog:",
-      "react-dom": "catalog:"
-    }
   }
 }

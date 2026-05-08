@@ -1,42 +1,8 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
-import authRouter from "./auth";
-import settingsRouter from "./settings";
-import accountsRouter from "./accounts";
-import linksRouter from "./links";
-import paymentsRouter from "./payments";
-import historyRouter from "./history";
-import customersRouter from "./customers";
-import chatRouter from "./chat";
-import customerAuthRouter from "./customerAuth";
-import storageRouter from "./storage";
-import sellerAuthRouter from "./sellerAuth";
-import sellerRouter from "./sellers";
-import activityRouter from "./activity";
-import wishlistRouter from "./wishlist";
-import notificationsRouter from "./notifications";
-import exportsRouter from "./exports";
-import shareRouter from "./share";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
-router.use(authRouter);
-router.use(customerAuthRouter);
-router.use(sellerAuthRouter);
-router.use(sellerRouter);
-router.use(settingsRouter);
-router.use(accountsRouter);
-router.use(linksRouter);
-router.use(paymentsRouter);
-router.use(historyRouter);
-router.use(customersRouter);
-router.use(chatRouter);
-router.use(storageRouter);
-router.use(activityRouter);
-router.use(wishlistRouter);
-router.use(notificationsRouter);
-router.use(exportsRouter);
-router.use(shareRouter);
 
 export default router;
