@@ -9,7 +9,6 @@ import {
   TrendingUp,
   TrendingDown,
   Wallet,
-  LogOut,
   Pencil,
   Loader2,
   MessageCircle,
@@ -33,7 +32,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDateTime, formatCurrency } from "@/lib/helpers";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface SellerStats {
   totalListings: number;
@@ -64,7 +62,7 @@ type StatusFilter = "all" | "active" | "under_review" | "sold" | "pending";
 
 export function SellerDashboard() {
   useSEO({ title: "Seller Dashboard — PUBG Marketplace" });
-  const { seller, isLoading, logout } = useSellerAuth();
+  const { seller, isLoading } = useSellerAuth();
   const [, setLocation] = useLocation();
   const [stats, setStats] = useState<SellerStats | null>(null);
   const [accounts, setAccounts] = useState<SellerAccount[]>([]);
@@ -72,13 +70,6 @@ export function SellerDashboard() {
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const [chatUnread, setChatUnread] = useState(0);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-
-  const handleLogoutConfirm = async () => {
-    await logout();
-    setShowLogoutConfirm(false);
-    setLocation("/");
-  };
 
   useEffect(() => {
     if (!isLoading && !seller) setLocation("/seller/login");
@@ -188,14 +179,6 @@ export function SellerDashboard() {
                 </button>
               </Link>
             )}
-            <button
-              onClick={() => setShowLogoutConfirm(true)}
-              className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-destructive hover:border-destructive/50 text-sm font-semibold transition"
-              data-testid="seller-logout-button"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
           </div>
         </div>
 
