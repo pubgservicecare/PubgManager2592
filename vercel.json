@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm install --frozen-lockfile=false && pnpm --filter @workspace/pubg-manager run build",
+  "outputDirectory": "artifacts/pubg-manager/dist/public",
+  "installCommand": "echo 'Skipping default install (handled in buildCommand)'",
+  "framework": null,
+  "build": {
+    "env": {
+      "PORT": "3000",
+      "BASE_PATH": "/",
+      "NODE_ENV": "production"
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

@@ -1,0 +1,44 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "GLFxykfZT7PnFl28BEToT"
+uri = "file://requirements.txt"
+type = "text"
+title = "Requirements (packages list)"
+
+[[outputs]]
+id = "6NnMkIPGIPuywj6HteqNZ"
+uri = "file://VSCODE_SETUP.txt"
+type = "text"
+title = "VS Code Setup Guide (step by step)"
+
+[[outputs]]
+id = "cyQ9dN331sbRgcnu9bFdR"
+uri = "file://attached_assets/screenshots/eldorado_gg_pubg-mobile-accounts-for-sale_a_21-1-0.png"
+type = "image"
+title = "Reference: Eldorado.gg PUBG marketplace"
+
+[[outputs]]
+id = "aH29Y0ZvZxeES0nYm0DuP"
+uri = "file://exports/deployment-guide.pdf"
+type = "pdf"
+title = "PUBG Account Manager — Deployment Guide (Render + Vercel)"
+
+[[outputs]]
+id = "JvZxARrXLUSRuqtBarDpc"
+uri = "file://pdfs/1_Admin_Manual.pdf"
+type = "pdf"
+title = "Admin Manual & Features Guide"
+
+[[outputs]]
+id = "Nasa3eaVvzcNP9aG9sSbA"
+uri = "file://pdfs/2_Seller_Manual.pdf"
+type = "pdf"
+title = "Seller Manual & Features Guide"
+
+[[outputs]]
+id = "QghotX5_laPm5ji0vv8eo"
+uri = "file://pdfs/3_Customer_Manual.pdf"
+type = "pdf"
+title = "Customer Manual & Features Guide"
