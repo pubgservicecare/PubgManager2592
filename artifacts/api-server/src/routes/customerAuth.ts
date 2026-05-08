@@ -123,27 +123,30 @@ router.post("/customer/login", async (req, res): Promise<void> => {
     return;
   }
 
-  const sess = req.session as any;
-  sess.customerId = user.id;
-  sess.customerPhone = user.phone;
-  sess.customerName = user.name;
-  sess.customerDbId = user.customerId;
-
-  res.json({
-    id: user.id,
-    phone: user.phone,
-    name: user.name,
-    customerId: user.customerId,
+  req.session.regenerate((err) => {
+    if (err) {
+      res.status(500).json({ error: "Session error, please try again" });
+      return;
+    }
+    const sess = req.session as any;
+    sess.customerId = user.id;
+    sess.customerPhone = user.phone;
+    sess.customerName = user.name;
+    sess.customerDbId = user.customerId;
+    res.json({
+      id: user.id,
+      phone: user.phone,
+      name: user.name,
+      customerId: user.customerId,
+    });
   });
 });
 
-router.post("/customer/logout", async (req, res): Promise<void> => {
-  const sess = req.session as any;
-  sess.customerId = undefined;
-  sess.customerPhone = undefined;
-  sess.customerName = undefined;
-  sess.customerDbId = undefined;
-  res.json({ success: true });
+router.post("/customer/logout", (req, res): void => {
+  req.session.destroy(() => {
+    res.clearCookie("connect.sid");
+    res.json({ success: true });
+  });
 });
 
 router.get("/customer/me", async (req, res): Promise<void> => {
@@ -202,6 +205,34 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   const trimmed = String(identifier).trim();
   const phoneNorm = normalizePhone(trimmed);
 
+  // Helper: write seller session fields after regenerate
+  const setSellerSession = (seller: typeof sellersTable.$inferSelect) =>
+    new Promise<void>((resolve, reject) => {
+      req.session.regenerate((err) => {
+        if (err) return reject(err);
+        const sess = req.session as any;
+        sess.sellerId = seller.id;
+        sess.sellerName = seller.name;
+        sess.sellerEmail = seller.email;
+        sess.sellerStatus = seller.status;
+        resolve();
+      });
+    });
+
+  // Helper: write customer session fields after regenerate
+  const setCustomerSession = (u: typeof customerUsersTable.$inferSelect) =>
+    new Promise<void>((resolve, reject) => {
+      req.session.regenerate((err) => {
+        if (err) return reject(err);
+        const sess = req.session as any;
+        sess.customerId = u.id;
+        sess.customerPhone = u.phone;
+        sess.customerName = u.name;
+        sess.customerDbId = u.customerId;
+        resolve();
+      });
+    });
+
   // 1) If looks like email, try seller by email first.
   if (isEmail) {
     const [seller] = await db
@@ -226,11 +257,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
         res.status(403).json({ error: "Your account has been suspended", status: "suspended" });
         return;
       }
-      const sess = req.session as any;
-      sess.sellerId = seller.id;
-      sess.sellerName = seller.name;
-      sess.sellerEmail = seller.email;
-      sess.sellerStatus = seller.status;
+      await setSellerSession(seller);
       res.json({
         role: "seller",
         user: { id: seller.id, name: seller.name, email: seller.email, status: seller.status },
@@ -249,11 +276,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   if (customerUser) {
     const ok = await bcrypt.compare(password, customerUser.passwordHash);
     if (ok) {
-      const sess = req.session as any;
-      sess.customerId = customerUser.id;
-      sess.customerPhone = customerUser.phone;
-      sess.customerName = customerUser.name;
-      sess.customerDbId = customerUser.customerId;
+      await setCustomerSession(customerUser);
       res.json({
         role: "customer",
         user: {
@@ -287,11 +310,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
       res.status(403).json({ error: "Your account has been suspended", status: "suspended" });
       return;
     }
-    const sess = req.session as any;
-    sess.sellerId = seller.id;
-    sess.sellerName = seller.name;
-    sess.sellerEmail = seller.email;
-    sess.sellerStatus = seller.status;
+    await setSellerSession(seller);
     res.json({
       role: "seller",
       user: { id: seller.id, name: seller.name, email: seller.email, status: seller.status },

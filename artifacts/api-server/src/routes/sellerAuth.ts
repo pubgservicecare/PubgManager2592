@@ -164,25 +164,29 @@ router.post("/seller/login", async (req, res): Promise<void> => {
     return;
   }
 
-  req.session.sellerId = seller.id;
-  req.session.sellerName = seller.name;
-  req.session.sellerEmail = seller.email;
-  req.session.sellerStatus = seller.status;
-
-  res.json({
-    id: seller.id,
-    name: seller.name,
-    email: seller.email,
-    status: seller.status,
+  req.session.regenerate((err) => {
+    if (err) {
+      res.status(500).json({ error: "Session error, please try again" });
+      return;
+    }
+    req.session.sellerId = seller.id;
+    req.session.sellerName = seller.name;
+    req.session.sellerEmail = seller.email;
+    req.session.sellerStatus = seller.status;
+    res.json({
+      id: seller.id,
+      name: seller.name,
+      email: seller.email,
+      status: seller.status,
+    });
   });
 });
 
-router.post("/seller/logout", async (req, res): Promise<void> => {
-  req.session.sellerId = undefined;
-  req.session.sellerName = undefined;
-  req.session.sellerEmail = undefined;
-  req.session.sellerStatus = undefined;
-  res.json({ success: true });
+router.post("/seller/logout", (req, res): void => {
+  req.session.destroy(() => {
+    res.clearCookie("connect.sid");
+    res.json({ success: true });
+  });
 });
 
 router.get("/seller/me", async (req, res): Promise<void> => {

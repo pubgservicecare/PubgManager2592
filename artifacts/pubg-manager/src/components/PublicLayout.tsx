@@ -31,13 +31,15 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { data: settings } = useGetSettings();
   const { customer, logout } = useCustomerAuth();
-  const { seller, refresh: refreshSeller } = useSellerAuth();
+  const { seller, refresh: refreshSeller, logout: logoutSeller } = useSellerAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [becomingSeller, setBecomingSeller] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogoutConfirm = async () => {
     await logout();
+    // Session is now fully destroyed on the server; clear seller state too
+    await refreshSeller();
     setShowLogoutConfirm(false);
     setMobileOpen(false);
     setLocation("/");
