@@ -370,7 +370,7 @@ function SellerSignupForm({ prefillName, prefillPhone }: { prefillName: string; 
       setSuccess(true);
       // Refresh seller auth in case the backend already attached an approved seller session.
       await refreshSeller();
-      setTimeout(() => setLocation("/my"), 3500);
+      setTimeout(() => setLocation("/"), 3500);
     } catch (e: any) {
       setErrorMsg(e.message);
     } finally {
