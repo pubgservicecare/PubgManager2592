@@ -1,22 +1,123 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: PUBG Account Manager API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: accounts
+    description: PUBG account management
+  - name: links
+    description: Account link management
+  - name: customers
+    description: Customer management
+  - name: sales
+    description: Sales and payments
+  - name: payments
+    description: Payment tracking
+  - name: history
+    description: History log
+  - name: chat
+    description: Chat system
+  - name: settings
+    description: App settings
+  - name: Storage
+    description: Object storage upload and serving endpoints
+  - name: sellers
+    description: Seller management
 paths:
+  /storage/uploads/request-url:
+    post:
+      tags: [Storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadUrlRequest'
+      responses:
+        '200':
+          description: Presigned upload URL generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadUrlResponse'
+        '400':
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Failed to generate upload URL.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /storage/public-objects/{filePath}:
+    get:
+      tags: [Storage]
+      operationId: getPublicObject
+      summary: Serve a public asset
+      parameters:
+        - name: filePath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Object content.
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /storage/objects/{objectPath}:
+    get:
+      tags: [Storage]
+      operationId: getStorageObject
+      summary: Serve an object entity
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Object content.
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +125,809 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/admin/login:
+    post:
+      operationId: adminLogin
+      tags: [auth]
+      summary: Admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: adminLogout
+      tags: [auth]
+      summary: Admin logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current admin session
+      responses:
+        "200":
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get app settings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update app settings (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSettingsBody"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+
+  /admin/activity:
+    get:
+      operationId: listActivityLogs
+      tags: [activity]
+      summary: List activity log entries (admin only)
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: actorType
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Activity logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityLog"
+
+  /accounts/{id}/status:
+    patch:
+      operationId: updateAccountStatus
+      tags: [accounts]
+      summary: Update account marketplace status (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [active, reserved, under_review, hidden]
+              required:
+                - status
+      responses:
+        "200":
+          description: Updated account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+
+  /accounts:
+    get:
+      operationId: listAccounts
+      tags: [accounts]
+      summary: List all accounts (admin sees all, public sees only active)
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, reserved, under_review, hidden, sold, installment]
+        - in: query
+          name: public
+          schema:
+            type: boolean
+        - in: query
+          name: listedBy
+          description: "admin = only accounts with no sellerId; seller = only accounts with sellerId; sellerId=N for one seller"
+          schema:
+            type: string
+        - in: query
+          name: sellerId
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Account"
+    post:
+      operationId: createAccount
+      tags: [accounts]
+      summary: Create a new account (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAccountBody"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+
+  /accounts/{id}:
+    get:
+      operationId: getAccount
+      tags: [accounts]
+      summary: Get account details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: public
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Account details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "404":
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateAccount
+      tags: [accounts]
+      summary: Update account (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAccountBody"
+      responses:
+        "200":
+          description: Updated account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+    delete:
+      operationId: deleteAccount
+      tags: [accounts]
+      summary: Delete account (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /accounts/{id}/sell:
+    post:
+      operationId: sellAccount
+      tags: [accounts]
+      summary: Sell an account (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SellAccountBody"
+      responses:
+        "200":
+          description: Account sold
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+
+  /accounts/{id}/links:
+    get:
+      operationId: listAccountLinks
+      tags: [links]
+      summary: List links for an account (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Links
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AccountLink"
+    post:
+      operationId: createAccountLink
+      tags: [links]
+      summary: Add a link to an account (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLinkBody"
+      responses:
+        "201":
+          description: Link created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountLink"
+
+  /accounts/{id}/links/{linkId}:
+    patch:
+      operationId: updateAccountLink
+      tags: [links]
+      summary: Update a link (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: linkId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLinkBody"
+      responses:
+        "200":
+          description: Updated link
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountLink"
+    delete:
+      operationId: deleteAccountLink
+      tags: [links]
+      summary: Delete a link (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: linkId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /accounts/{id}/history:
+    get:
+      operationId: getAccountHistory
+      tags: [history]
+      summary: Get history for an account (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: History entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HistoryEntry"
+
+  /accounts/{id}/payments:
+    get:
+      operationId: listAccountPayments
+      tags: [payments]
+      summary: List payments for an account (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+    post:
+      operationId: addPayment
+      tags: [payments]
+      summary: Add a payment to an installment account (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddPaymentBody"
+      responses:
+        "201":
+          description: Payment added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /accounts/{id}/payments/scheduled:
+    post:
+      operationId: addScheduledPayment
+      tags: [payments]
+      summary: Add a scheduled payment with due date (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddScheduledPaymentBody"
+      responses:
+        "201":
+          description: Scheduled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /accounts/{id}/payments/{paymentId}:
+    patch:
+      operationId: editPayment
+      tags: [payments]
+      summary: Edit a payment (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: paymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditPaymentBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /accounts/{id}/payments/{paymentId}/mark-paid:
+    patch:
+      operationId: markPaymentPaid
+      tags: [payments]
+      summary: Mark a scheduled payment as paid (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: paymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkPaidBody"
+      responses:
+        "200":
+          description: Marked paid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /accounts/{id}/payments/{paymentId}/reverse:
+    post:
+      operationId: reversePayment
+      tags: [payments]
+      summary: Reverse a payment by adding a reversal entry (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: paymentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReversePaymentBody"
+      responses:
+        "201":
+          description: Reversed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /customer/installments:
+    get:
+      operationId: getCustomerInstallments
+      tags: [customers]
+      summary: Get logged-in customer's installment accounts with payments and due dates
+      responses:
+        "200":
+          description: Installments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomerInstallmentAccount"
+
+  /accounts/{id}/payments/{paymentId}/receipt:
+    get:
+      operationId: downloadPaymentReceipt
+      tags: [payments]
+      summary: Download a payment receipt as PDF (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: paymentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDF receipt
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  /customer/payments/{paymentId}/receipt:
+    get:
+      operationId: downloadCustomerPaymentReceipt
+      tags: [customers]
+      summary: Download own payment receipt as PDF (customer)
+      parameters:
+        - in: path
+          name: paymentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDF receipt
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  /customers:
+    get:
+      operationId: listCustomers
+      tags: [customers]
+      summary: List all customers (admin only)
+      responses:
+        "200":
+          description: Customers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Customer"
+
+  /customers/{id}:
+    get:
+      operationId: getCustomer
+      tags: [customers]
+      summary: Get customer details (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateCustomer
+      tags: [customers]
+      summary: Update a customer's name and/or contact (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCustomerBody"
+      responses:
+        "200":
+          description: Updated customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteCustomer
+      tags: [customers]
+      summary: Delete a customer (admin only). Detaches accounts and removes login user.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                required: [success]
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /chat/sessions:
+    get:
+      operationId: listChatSessions
+      tags: [chat]
+      summary: List all chat sessions (admin only)
+      responses:
+        "200":
+          description: Sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatSession"
+
+  /chat/sessions/{sessionId}/messages:
+    get:
+      operationId: getChatMessages
+      tags: [chat]
+      summary: Get messages for a session
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+    post:
+      operationId: sendChatMessage
+      tags: [chat]
+      summary: Send a chat message
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageBody"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+
+  /chat/sessions/{sessionId}/read:
+    post:
+      operationId: markSessionRead
+      tags: [chat]
+      summary: Mark session as read (admin only)
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [accounts]
+      summary: Get dashboard stats (admin only)
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +938,756 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    LoginBody:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        username:
+          type: string
+      required:
+        - success
+        - username
+
+    MeResponse:
+      type: object
+      properties:
+        authenticated:
+          type: boolean
+        username:
+          type: ["string", "null"]
+      required:
+        - authenticated
+
+    Settings:
+      type: object
+      properties:
+        id:
+          type: integer
+        siteName:
+          type: string
+        siteDescription:
+          type: string
+        heroTagline:
+          type: string
+        footerText:
+          type: string
+        logoUrl:
+          type: ["string", "null"]
+        supportEmail:
+          type: string
+        whatsappNumber:
+          type: string
+        businessAddress:
+          type: ["string", "null"]
+        allowSellerRegistration:
+          type: boolean
+        defaultSellerCommissionPercent:
+          type: integer
+        showSellerNamesPublicly:
+          type: boolean
+        bannerEnabled:
+          type: boolean
+        bannerText:
+          type: ["string", "null"]
+        popularSearches:
+          type: string
+        paymentMethodsInfo:
+          type: ["string", "null"]
+        maintenanceMode:
+          type: boolean
+        maintenanceMessage:
+          type: string
+        facebookUrl:
+          type: ["string", "null"]
+        instagramUrl:
+          type: ["string", "null"]
+        youtubeUrl:
+          type: ["string", "null"]
+        tiktokUrl:
+          type: ["string", "null"]
+        discordUrl:
+          type: ["string", "null"]
+        adminUsername:
+          type: string
+      required:
+        - id
+        - siteName
+        - siteDescription
+        - heroTagline
+        - footerText
+        - supportEmail
+        - whatsappNumber
+        - allowSellerRegistration
+        - defaultSellerCommissionPercent
+        - showSellerNamesPublicly
+        - bannerEnabled
+        - popularSearches
+        - maintenanceMode
+        - maintenanceMessage
+        - adminUsername
+
+    UpdateSettingsBody:
+      type: object
+      properties:
+        siteName:
+          type: string
+        siteDescription:
+          type: string
+        heroTagline:
+          type: string
+        footerText:
+          type: string
+        logoUrl:
+          type: ["string", "null"]
+        supportEmail:
+          type: string
+        whatsappNumber:
+          type: string
+        businessAddress:
+          type: ["string", "null"]
+        allowSellerRegistration:
+          type: boolean
+        defaultSellerCommissionPercent:
+          type: integer
+        showSellerNamesPublicly:
+          type: boolean
+        bannerEnabled:
+          type: boolean
+        bannerText:
+          type: ["string", "null"]
+        popularSearches:
+          type: string
+        paymentMethodsInfo:
+          type: ["string", "null"]
+        maintenanceMode:
+          type: boolean
+        maintenanceMessage:
+          type: string
+        facebookUrl:
+          type: ["string", "null"]
+        instagramUrl:
+          type: ["string", "null"]
+        youtubeUrl:
+          type: ["string", "null"]
+        tiktokUrl:
+          type: ["string", "null"]
+        discordUrl:
+          type: ["string", "null"]
+        adminUsername:
+          type: string
+        adminPassword:
+          type: string
+
+    ActivityLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        actorType:
+          type: string
+          enum: [admin, seller, customer, system]
+        actorName:
+          type: string
+        actorId:
+          type: ["integer", "null"]
+        action:
+          type: string
+        targetType:
+          type: ["string", "null"]
+        targetId:
+          type: ["integer", "null"]
+        details:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - actorType
+        - actorName
+        - action
+        - createdAt
+
+    Account:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        accountId:
+          type: string
+        purchasePrice:
+          type: ["number", "null"]
+        priceForSale:
+          type: number
+        finalSoldPrice:
+          type: ["number", "null"]
+        purchaseDate:
+          type: ["string", "null"]
+        previousOwnerContact:
+          type: ["string", "null"]
+        videoUrl:
+          type: ["string", "null"]
+        imageUrls:
+          type: array
+          items:
+            type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [active, reserved, under_review, hidden, sold, installment]
+        customerId:
+          type: ["integer", "null"]
+        customerName:
+          type: ["string", "null"]
+        customerContact:
+          type: ["string", "null"]
+        sellerId:
+          type: ["integer", "null"]
+        sellerName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountLink"
+        pendingLinksCount:
+          type: integer
+        totalPaid:
+          type: ["number", "null"]
+        remainingAmount:
+          type: ["number", "null"]
+        nextDueDate:
+          type: ["string", "null"]
+        overdueCount:
+          type: ["integer", "null"]
+        dueSoonCount:
+          type: ["integer", "null"]
+      required:
+        - id
+        - title
+        - accountId
+        - priceForSale
+        - status
+        - createdAt
+        - updatedAt
+        - links
+        - pendingLinksCount
+
+    CreateAccountBody:
+      type: object
+      properties:
+        title:
+          type: string
+        accountId:
+          type: string
+        purchasePrice:
+          type: number
+        priceForSale:
+          type: number
+        purchaseDate:
+          type: ["string", "null"]
+        previousOwnerContact:
+          type: ["string", "null"]
+        videoUrl:
+          type: ["string", "null"]
+        imageUrls:
+          type: array
+          items:
+            type: string
+        description:
+          type: ["string", "null"]
+      required:
+        - title
+        - accountId
+        - purchasePrice
+        - priceForSale
+
+    UpdateAccountBody:
+      type: object
+      properties:
+        title:
+          type: string
+        accountId:
+          type: string
+        purchasePrice:
+          type: number
+        priceForSale:
+          type: number
+        purchaseDate:
+          type: ["string", "null"]
+        previousOwnerContact:
+          type: ["string", "null"]
+        videoUrl:
+          type: ["string", "null"]
+        imageUrls:
+          type: array
+          items:
+            type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [active, reserved, under_review, hidden, sold, installment]
+
+    SellAccountBody:
+      type: object
+      properties:
+        customerName:
+          type: string
+        customerContact:
+          type: string
+        finalSoldPrice:
+          type: number
+        paymentType:
+          type: string
+          enum: [full, installment]
+        installmentTotal:
+          type: ["number", "null"]
+      required:
+        - customerName
+        - customerContact
+        - finalSoldPrice
+        - paymentType
+
+    AccountLink:
+      type: object
+      properties:
+        id:
+          type: integer
+        accountId:
+          type: integer
+        type:
+          type: string
+          enum: [twitter, google, facebook, game_center, apple, tiktok, whatsapp, number, mail]
+        login:
+          type: string
+        password:
+          type: string
+        value:
+          type: string
+        status:
+          type: string
+          enum: [old_owner, my_controlled, transferred]
+        isPending:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - accountId
+        - type
+        - login
+        - password
+        - value
+        - status
+        - isPending
+        - createdAt
+
+    CreateLinkBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [twitter, google, facebook, game_center, apple, tiktok, whatsapp, number, mail]
+        login:
+          type: string
+        password:
+          type: string
+        value:
+          type: string
+        status:
+          type: string
+          enum: [old_owner, my_controlled, transferred]
+      required:
+        - type
+        - login
+        - password
+        - status
+
+    UpdateLinkBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [twitter, google, facebook, game_center, apple, tiktok, whatsapp, number, mail]
+        login:
+          type: string
+        password:
+          type: string
+        value:
+          type: string
+        status:
+          type: string
+          enum: [old_owner, my_controlled, transferred]
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: integer
+        accountId:
+          type: integer
+        amount:
+          type: number
+        note:
+          type: ["string", "null"]
+        dueDate:
+          type: ["string", "null"]
+        paidAt:
+          type: ["string", "null"]
+        receiptNumber:
+          type: ["string", "null"]
+        isReversal:
+          type: boolean
+        reversesPaymentId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - accountId
+        - amount
+        - isReversal
+        - createdAt
+
+    AddPaymentBody:
+      type: object
+      properties:
+        amount:
+          type: number
+        note:
+          type: ["string", "null"]
+        dueDate:
+          type: ["string", "null"]
+        paymentDate:
+          type: ["string", "null"]
+      required:
+        - amount
+
+    AddScheduledPaymentBody:
+      type: object
+      properties:
+        amount:
+          type: number
+        dueDate:
+          type: string
+        note:
+          type: ["string", "null"]
+      required:
+        - amount
+        - dueDate
+
+    EditPaymentBody:
+      type: object
+      properties:
+        amount:
+          type: ["number", "null"]
+        note:
+          type: ["string", "null"]
+        dueDate:
+          type: ["string", "null"]
+        paymentDate:
+          type: ["string", "null"]
+
+    ReversePaymentBody:
+      type: object
+      properties:
+        reason:
+          type: ["string", "null"]
+
+    MarkPaidBody:
+      type: object
+      properties:
+        paymentDate:
+          type: ["string", "null"]
+
+    CustomerInstallmentAccount:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        accountId:
+          type: string
+        finalSoldPrice:
+          type: ["number", "null"]
+        totalPaid:
+          type: number
+        remainingAmount:
+          type: number
+        nextDueDate:
+          type: ["string", "null"]
+        overdueCount:
+          type: integer
+        dueSoonCount:
+          type: integer
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Payment"
+      required:
+        - id
+        - title
+        - accountId
+        - totalPaid
+        - remainingAmount
+        - overdueCount
+        - dueSoonCount
+        - payments
+
+    DueAlertItem:
+      type: object
+      properties:
+        paymentId:
+          type: integer
+        accountId:
+          type: integer
+        accountTitle:
+          type: string
+        customerName:
+          type: ["string", "null"]
+        amount:
+          type: number
+        dueDate:
+          type: string
+        daysUntilDue:
+          type: integer
+      required:
+        - paymentId
+        - accountId
+        - accountTitle
+        - amount
+        - dueDate
+        - daysUntilDue
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        contact:
+          type: string
+        deals:
+          type: array
+          items:
+            $ref: "#/components/schemas/Account"
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - contact
+        - deals
+        - createdAt
+
+    UpdateCustomerBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        contact:
+          type: string
+          minLength: 1
+
+    HistoryEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        accountId:
+          type: integer
+        action:
+          type: string
+        details:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - accountId
+        - action
+        - createdAt
+
+    ChatSession:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        accountId:
+          type: ["integer", "null"]
+        accountTitle:
+          type: ["string", "null"]
+        guestName:
+          type: ["string", "null"]
+        lastMessage:
+          type: ["string", "null"]
+        lastMessageAt:
+          type: ["string", "null"]
+        unreadCount:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - sessionId
+        - unreadCount
+        - createdAt
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        sessionId:
+          type: string
+        sender:
+          type: string
+          enum: [customer, admin]
+        message:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - sessionId
+        - sender
+        - message
+        - createdAt
+
+    SendMessageBody:
+      type: object
+      properties:
+        message:
+          type: string
+        sender:
+          type: string
+          enum: [customer, admin]
+        guestName:
+          type: ["string", "null"]
+        accountId:
+          type: ["integer", "null"]
+      required:
+        - message
+        - sender
+
+    DashboardStats:
+      type: object
+      properties:
+        totalInvestment:
+          type: number
+        totalRevenue:
+          type: number
+        netProfit:
+          type: number
+        totalAccounts:
+          type: integer
+        activeAccounts:
+          type: integer
+        soldAccounts:
+          type: integer
+        installmentAccounts:
+          type: integer
+        pendingLinksCount:
+          type: integer
+        pendingPaymentsCount:
+          type: integer
+        unreadChatsCount:
+          type: integer
+        dueAlerts:
+          type: object
+          properties:
+            overdueCount:
+              type: integer
+            dueSoonCount:
+              type: integer
+            overdue:
+              type: array
+              items:
+                $ref: "#/components/schemas/DueAlertItem"
+            dueSoon:
+              type: array
+              items:
+                $ref: "#/components/schemas/DueAlertItem"
+          required:
+            - overdueCount
+            - dueSoonCount
+            - overdue
+            - dueSoon
+      required:
+        - totalInvestment
+        - totalRevenue
+        - netProfit
+        - totalAccounts
+        - activeAccounts
+        - soldAccounts
+        - installmentAccounts
+        - pendingLinksCount
+        - pendingPaymentsCount
+        - unreadChatsCount
+
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+          minimum: 1
+        contentType:
+          type: string
+          minLength: 1
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+        objectPath:
+          type: string
+        metadata:
+          $ref: '#/components/schemas/UploadUrlRequest'
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

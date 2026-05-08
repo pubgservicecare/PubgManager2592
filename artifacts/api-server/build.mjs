@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { rm } from "node:fs/promises";
+import { rm, mkdir, cp } from "node:fs/promises";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
@@ -13,6 +13,20 @@ const artifactDir = path.dirname(fileURLToPath(import.meta.url));
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
   await rm(distDir, { recursive: true, force: true });
+
+  // Copy pdfkit's data files (AFM fonts, ICC profiles) so the bundled
+  // server can find them at runtime via __dirname/data/*.
+  try {
+    const pdfkitDataDir = path.resolve(
+      artifactDir,
+      "node_modules/pdfkit/js/data",
+    );
+    const distDataDir = path.resolve(distDir, "data");
+    await mkdir(distDataDir, { recursive: true });
+    await cp(pdfkitDataDir, distDataDir, { recursive: true });
+  } catch (err) {
+    console.warn("Could not copy pdfkit data files:", err?.message || err);
+  }
 
   await esbuild({
     entryPoints: [path.resolve(artifactDir, "src/index.ts")],

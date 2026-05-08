@@ -1,0 +1,32 @@
+kind = "web"
+  previewPath = "/"
+  title = "PUBG Account Manager"
+  version = "1.0.0"
+  id = "artifacts/pubg-manager"
+  router = "path"
+
+  [[integratedSkills]]
+  name = "react-vite"
+  version = "1.0.0"
+
+  [[services]]
+  name = "web"
+  paths = [ "/" ]
+  localPort = 21604
+
+  [services.development]
+  run = "pnpm --filter @workspace/pubg-manager run dev"
+
+  [services.production]
+  build = [ "pnpm", "--filter", "@workspace/pubg-manager", "run", "build" ]
+  publicDir = "artifacts/pubg-manager/dist/public"
+  serve = "static"
+
+  [[services.production.rewrites]]
+  from = "/*"
+  to = "/index.html"
+
+  [services.env]
+  PORT = "21604"
+  BASE_PATH = "/"
+  
