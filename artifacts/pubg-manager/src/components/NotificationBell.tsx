@@ -29,7 +29,7 @@ export function NotificationBell() {
     let cancelled = false;
     const fetchUnread = async () => {
       try {
-        const r = await fetch("/api/notifications/unread-count", { credentials: "include" });
+        const r = await fetch("/api/customer/notifications/unread-count", { credentials: "include" });
         if (!r.ok) return;
         const data = await r.json();
         if (!cancelled) setUnread(data.count ?? 0);
@@ -45,14 +45,14 @@ export function NotificationBell() {
 
   useEffect(() => {
     if (!open || !customer) return;
-    fetch("/api/notifications", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setItems(Array.isArray(data) ? data : []))
+    fetch("/api/customer/notifications", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((data) => setItems(Array.isArray(data.items) ? data.items.map((n: any) => ({ ...n, isRead: n.read })) : []))
       .catch(() => {});
   }, [open, customer]);
 
   const markAllRead = async () => {
-    await fetch("/api/notifications/mark-all-read", {
+    await fetch("/api/customer/notifications/mark-all-read", {
       method: "POST",
       credentials: "include",
     });
@@ -62,8 +62,8 @@ export function NotificationBell() {
 
   const handleClick = async (n: Notif) => {
     if (!n.isRead) {
-      await fetch(`/api/notifications/${n.id}/read`, {
-        method: "POST",
+      await fetch(`/api/customer/notifications/${n.id}/read`, {
+        method: "PATCH",
         credentials: "include",
       });
       setItems((xs) => xs.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)));

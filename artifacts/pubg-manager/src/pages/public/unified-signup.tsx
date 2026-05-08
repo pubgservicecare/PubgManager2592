@@ -175,7 +175,7 @@ function CustomerSignupForm() {
     setLoading(true);
     try {
       await signup(name, phone, password, referralCode || undefined);
-      setLocation("/my");
+      setLocation("/");
     } catch (err: any) {
       setError(err.message);
     } finally {
