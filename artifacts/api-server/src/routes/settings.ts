@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, settingsTable } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLog";
+import bcrypt from "bcryptjs";
 
 const router: IRouter = Router();
 
@@ -52,7 +53,7 @@ const BOOLEAN_FIELDS = new Set([
 
 const NUMERIC_FIELDS = new Set(["defaultSellerCommissionPercent"]);
 
-function getInitialAdminCredentials(): { adminUsername: string; adminPassword: string } {
+async function getInitialAdminCredentials(): Promise<{ adminUsername: string; adminPassword: string }> {
   const adminUsername = process.env.ADMIN_USERNAME;
   const adminPassword = process.env.ADMIN_PASSWORD;
   if (!adminUsername || !adminPassword) {
@@ -60,13 +61,14 @@ function getInitialAdminCredentials(): { adminUsername: string; adminPassword: s
       "ADMIN_USERNAME and ADMIN_PASSWORD environment variables are required for first-run setup.",
     );
   }
-  return { adminUsername, adminPassword };
+  const hashedPassword = await bcrypt.hash(adminPassword, 12);
+  return { adminUsername, adminPassword: hashedPassword };
 }
 
 router.get("/settings", async (_req, res): Promise<void> => {
   let [settings] = await db.select().from(settingsTable).limit(1);
   if (!settings) {
-    [settings] = await db.insert(settingsTable).values(getInitialAdminCredentials()).returning();
+    [settings] = await db.insert(settingsTable).values(await getInitialAdminCredentials()).returning();
   }
   const { adminPassword: _pw, ...safeSettings } = settings;
   res.json(safeSettings);
@@ -77,7 +79,7 @@ router.patch("/settings", requireAdmin, async (req, res): Promise<void> => {
 
   let [settings] = await db.select().from(settingsTable).limit(1);
   if (!settings) {
-    [settings] = await db.insert(settingsTable).values(getInitialAdminCredentials()).returning();
+    [settings] = await db.insert(settingsTable).values(await getInitialAdminCredentials()).returning();
   }
 
   const updates: Record<string, any> = {};
@@ -92,7 +94,7 @@ router.patch("/settings", requireAdmin, async (req, res): Promise<void> => {
       updates[field] = body[field] === "" ? null : body[field];
     }
   }
-  if (body.adminPassword) updates.adminPassword = body.adminPassword;
+  if (body.adminPassword) updates.adminPassword = await bcrypt.hash(body.adminPassword, 12);
 
   const requiredText: Array<keyof typeof settingsTable.$inferSelect> = [
     "siteName",

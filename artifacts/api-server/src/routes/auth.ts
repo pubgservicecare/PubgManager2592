@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, settingsTable } from "@workspace/db";
+import bcrypt from "bcryptjs";
 
 const router: IRouter = Router();
 
@@ -23,7 +24,12 @@ router.post("/auth/admin/login", async (req, res): Promise<void> => {
     return;
   }
 
-  if (username === settings.adminUsername && password === settings.adminPassword) {
+  const usernameMatch = username === settings.adminUsername;
+  const passwordMatch = settings.adminPassword.startsWith("$2")
+    ? await bcrypt.compare(password, settings.adminPassword)
+    : password === settings.adminPassword;
+
+  if (usernameMatch && passwordMatch) {
     req.session.isAdmin = true;
     req.session.username = settings.adminUsername;
     res.json({ success: true, username: settings.adminUsername });
