@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { db, settingsTable } from "@workspace/db";
+import { db, settingsTable, customerUsersTable, sellersTable } from "@workspace/db";
 import bcrypt from "bcryptjs";
+import { eq, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -37,6 +38,84 @@ router.post("/auth/admin/login", async (req, res): Promise<void> => {
   }
 
   res.status(401).json({ error: "Invalid credentials" });
+});
+
+// Unified login: identifier = phone → customer, identifier = email → seller
+router.post("/auth/login", async (req, res): Promise<void> => {
+  const { identifier, password } = req.body;
+  if (!identifier || !password) {
+    res.status(400).json({ error: "Identifier and password required" });
+    return;
+  }
+
+  const isEmail = typeof identifier === "string" && identifier.includes("@");
+
+  if (isEmail) {
+    // Try seller login
+    const normalizedEmail = String(identifier).trim().toLowerCase();
+    const [seller] = await db
+      .select()
+      .from(sellersTable)
+      .where(sql`LOWER(${sellersTable.email}) = ${normalizedEmail}`);
+
+    if (!seller) {
+      res.status(401).json({ error: "Invalid email or password" });
+      return;
+    }
+    const valid = await bcrypt.compare(password, seller.passwordHash);
+    if (!valid) {
+      res.status(401).json({ error: "Invalid email or password" });
+      return;
+    }
+    if (seller.status === "pending") {
+      res.status(403).json({ error: "Your application is still under review by admin", status: "pending" });
+      return;
+    }
+    if (seller.status === "rejected") {
+      res.status(403).json({ error: `Application rejected: ${seller.rejectionReason || "Contact support"}`, status: "rejected" });
+      return;
+    }
+    if (seller.status === "suspended") {
+      res.status(403).json({ error: "Your account has been suspended", status: "suspended" });
+      return;
+    }
+
+    req.session.regenerate((err) => {
+      if (err) { res.status(500).json({ error: "Session error, please try again" }); return; }
+      req.session.sellerId = seller.id;
+      req.session.sellerName = seller.name;
+      req.session.sellerEmail = seller.email;
+      req.session.sellerStatus = seller.status;
+      res.json({ role: "seller", id: seller.id, name: seller.name, email: seller.email, status: seller.status });
+    });
+  } else {
+    // Try customer login by phone
+    const phone = String(identifier).trim();
+    const [user] = await db
+      .select()
+      .from(customerUsersTable)
+      .where(eq(customerUsersTable.phone, phone));
+
+    if (!user) {
+      res.status(401).json({ error: "Invalid phone number or password" });
+      return;
+    }
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      res.status(401).json({ error: "Invalid phone number or password" });
+      return;
+    }
+
+    req.session.regenerate((err) => {
+      if (err) { res.status(500).json({ error: "Session error, please try again" }); return; }
+      const sess = req.session as any;
+      sess.customerId = user.id;
+      sess.customerPhone = user.phone;
+      sess.customerName = user.name;
+      sess.customerDbId = user.customerId;
+      res.json({ role: "customer", id: user.id, phone: user.phone, name: user.name, customerId: user.customerId });
+    });
+  }
 });
 
 router.post("/auth/logout", (req, res): void => {

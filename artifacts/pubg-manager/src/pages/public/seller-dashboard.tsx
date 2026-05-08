@@ -5,6 +5,7 @@ import { useSEO } from "@/hooks/use-seo";
 import { useSellerAuth } from "@/hooks/use-seller-auth";
 import {
   Plus,
+  LogOut,
   Package,
   TrendingUp,
   TrendingDown,
@@ -32,6 +33,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDateTime, formatCurrency } from "@/lib/helpers";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface SellerStats {
   totalListings: number;
@@ -62,7 +64,8 @@ type StatusFilter = "all" | "active" | "under_review" | "sold" | "pending";
 
 export function SellerDashboard() {
   useSEO({ title: "Seller Dashboard — PUBG Marketplace" });
-  const { seller, isLoading } = useSellerAuth();
+  const { seller, isLoading, logout } = useSellerAuth();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [, setLocation] = useLocation();
   const [stats, setStats] = useState<SellerStats | null>(null);
   const [accounts, setAccounts] = useState<SellerAccount[]>([]);
@@ -70,6 +73,12 @@ export function SellerDashboard() {
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const [chatUnread, setChatUnread] = useState(0);
+
+  const handleLogout = async () => {
+    await logout();
+    setShowLogoutConfirm(false);
+    setLocation("/login");
+  };
 
   useEffect(() => {
     if (!isLoading && !seller) setLocation("/seller/login");
@@ -179,6 +188,14 @@ export function SellerDashboard() {
                 </button>
               </Link>
             )}
+            <button
+              onClick={() => setShowLogoutConfirm(true)}
+              className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-destructive hover:border-destructive/50 text-sm font-semibold transition"
+              data-testid="seller-logout-button"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
           </div>
         </div>
 
@@ -1044,5 +1061,16 @@ function AdminChatPanel({
         )}
       </AnimatePresence>
     </motion.div>
+
+    <ConfirmDialog
+      open={showLogoutConfirm}
+      title="Logout"
+      message="Kya aap waqai logout karna chahte hain?"
+      confirmLabel="Yes, Logout"
+      cancelLabel="Cancel"
+      busyLabel="Logging out..."
+      onConfirm={handleLogout}
+      onCancel={() => setShowLogoutConfirm(false)}
+    />
   );
 }

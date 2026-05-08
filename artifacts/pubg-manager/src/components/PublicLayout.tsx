@@ -38,8 +38,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
 
   const handleLogoutConfirm = async () => {
     await logout();
-    // Session is now fully destroyed on the server; clear seller state too
-    await refreshSeller();
+    await logoutSeller();
     setShowLogoutConfirm(false);
     setMobileOpen(false);
     setLocation("/");
