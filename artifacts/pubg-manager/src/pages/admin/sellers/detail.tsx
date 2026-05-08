@@ -187,7 +187,7 @@ export function AdminSellerDetail() {
           {/* Compact action chips — WhatsApp, Chat, Personal Info */}
           <div className="flex flex-wrap gap-2 mb-4">
             <ActionTile
-              icon={SiWhatsapp}
+              icon={WhatsappIcon}
               label="WhatsApp"
               color="emerald"
               disabled={!seller.whatsapp}
