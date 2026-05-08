@@ -29,14 +29,15 @@ app.use(
   }),
 );
 
+const isProduction = process.env.NODE_ENV === "production";
 const corsOrigin = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(",").map((o) => o.trim())
-  : true;
+  : isProduction
+    ? (() => { throw new Error("FRONTEND_URL must be set in production for CORS."); })()
+    : false;
 app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-const isProduction = process.env.NODE_ENV === "production";
 const PgSession = connectPgSimple(session);
 
 app.use(

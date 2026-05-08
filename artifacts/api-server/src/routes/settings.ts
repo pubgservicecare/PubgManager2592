@@ -52,10 +52,21 @@ const BOOLEAN_FIELDS = new Set([
 
 const NUMERIC_FIELDS = new Set(["defaultSellerCommissionPercent"]);
 
+function getInitialAdminCredentials(): { adminUsername: string; adminPassword: string } {
+  const adminUsername = process.env.ADMIN_USERNAME;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminUsername || !adminPassword) {
+    throw new Error(
+      "ADMIN_USERNAME and ADMIN_PASSWORD environment variables are required for first-run setup.",
+    );
+  }
+  return { adminUsername, adminPassword };
+}
+
 router.get("/settings", async (_req, res): Promise<void> => {
   let [settings] = await db.select().from(settingsTable).limit(1);
   if (!settings) {
-    [settings] = await db.insert(settingsTable).values({}).returning();
+    [settings] = await db.insert(settingsTable).values(getInitialAdminCredentials()).returning();
   }
   const { adminPassword: _pw, ...safeSettings } = settings;
   res.json(safeSettings);
@@ -66,7 +77,7 @@ router.patch("/settings", requireAdmin, async (req, res): Promise<void> => {
 
   let [settings] = await db.select().from(settingsTable).limit(1);
   if (!settings) {
-    [settings] = await db.insert(settingsTable).values({}).returning();
+    [settings] = await db.insert(settingsTable).values(getInitialAdminCredentials()).returning();
   }
 
   const updates: Record<string, any> = {};

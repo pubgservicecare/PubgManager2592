@@ -34,9 +34,9 @@ export const settingsTable = pgTable("settings", {
   youtubeUrl: text("youtube_url"),
   tiktokUrl: text("tiktok_url"),
   discordUrl: text("discord_url"),
-  // Auth
-  adminUsername: text("admin_username").notNull().default("admin"),
-  adminPassword: text("admin_password").notNull().default("admin123"),
+  // Auth (no defaults — credentials must be set via admin settings on first run)
+  adminUsername: text("admin_username").notNull(),
+  adminPassword: text("admin_password").notNull(),
   // File Storage (configurable from Admin UI)
   storageProvider: text("storage_provider").notNull().default("local"),
   gcsBucketName: text("gcs_bucket_name"),
