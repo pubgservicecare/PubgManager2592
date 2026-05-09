@@ -37,8 +37,13 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogoutConfirm = async () => {
-    await logout();
-    await logoutSeller();
+    // Destroy whichever session is active (customer takes priority; seller-only uses seller logout)
+    if (customer) {
+      await logout();
+      await refreshSeller(); // session destroyed, seller state should now be 401
+    } else {
+      await logoutSeller();
+    }
     setShowLogoutConfirm(false);
     setMobileOpen(false);
     setLocation("/");
@@ -195,6 +200,19 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
                   </button>
                 </div>
               </>
+            ) : seller ? (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/50 border border-border text-sm">
+                <Store className="w-4 h-4 text-emerald-400" />
+                <span className="text-white font-semibold max-w-[120px] truncate">{seller.name}</span>
+                <button
+                  onClick={() => setShowLogoutConfirm(true)}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                  aria-label="Logout"
+                  data-testid="seller-header-logout-button"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
             ) : (
               <>
                 <Link href="/chat/guest">
@@ -216,7 +234,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
           {/* Mobile: avatar/cta + hamburger */}
           <div className="md:hidden flex items-center gap-2">
             {customer && <NotificationBell />}
-            {!customer && (
+            {!customer && !seller && (
               <Link href="/login">
                 <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs transition-all">
                   <LogIn className="w-3.5 h-3.5" />

@@ -187,14 +187,6 @@ export function SellerDashboard() {
                 </button>
               </Link>
             )}
-            <button
-              onClick={() => setShowLogoutConfirm(true)}
-              className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-destructive hover:border-destructive/50 text-sm font-semibold transition"
-              data-testid="seller-logout-button"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
           </div>
         </div>
 
