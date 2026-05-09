@@ -120,6 +120,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 
 router.post("/auth/logout", (req, res): void => {
   req.session.destroy(() => {
+    res.clearCookie("connect.sid", { path: "/", httpOnly: true, sameSite: "lax" });
     res.json({ success: true });
   });
 });

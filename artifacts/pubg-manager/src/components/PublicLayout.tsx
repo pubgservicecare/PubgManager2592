@@ -31,7 +31,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { data: settings } = useGetSettings();
   const { customer, logout } = useCustomerAuth();
-  const { seller, refresh: refreshSeller, logout: logoutSeller } = useSellerAuth();
+  const { seller, isLoading: sellerLoading, refresh: refreshSeller, logout: logoutSeller } = useSellerAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [becomingSeller, setBecomingSeller] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -150,7 +150,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               </div>
             </Link>
 
-            {seller ? (
+            {!sellerLoading && seller ? (
               <Link href="/seller/dashboard">
                 <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white transition-all cursor-pointer font-semibold text-sm">
                   <Store className="w-4 h-4" />
@@ -320,7 +320,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
                   </Link>
                 </>
               )}
-              {seller ? (
+              {!sellerLoading && seller ? (
                 <Link href="/seller/dashboard">
                   <div className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold cursor-pointer transition-colors hover:bg-emerald-500 hover:text-white">
                     <Store className="w-4 h-4" />

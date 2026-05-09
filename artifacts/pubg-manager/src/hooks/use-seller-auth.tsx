@@ -64,6 +64,7 @@ export function SellerAuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await fetch("/api/seller/logout", { method: "POST", credentials: "include" });
     setSeller(null);
+    await refresh();
   };
 
   return (

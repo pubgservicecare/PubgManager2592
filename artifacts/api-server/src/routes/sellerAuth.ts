@@ -183,8 +183,12 @@ router.post("/seller/login", async (req, res): Promise<void> => {
 });
 
 router.post("/seller/logout", (req, res): void => {
+  req.session.sellerId = undefined;
+  req.session.sellerName = undefined;
+  req.session.sellerEmail = undefined;
+  req.session.sellerStatus = undefined;
   req.session.destroy(() => {
-    res.clearCookie("connect.sid");
+    res.clearCookie("connect.sid", { path: "/", httpOnly: true, sameSite: "lax" });
     res.json({ success: true });
   });
 });
