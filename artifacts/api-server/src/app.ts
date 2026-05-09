@@ -30,11 +30,17 @@ app.use(
 );
 
 const isProduction = process.env.NODE_ENV === "production";
-const corsOrigin = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL.split(",").map((o) => o.trim())
-  : isProduction
-    ? (() => { throw new Error("FRONTEND_URL must be set in production for CORS."); })()
-    : false;
+const corsOrigins: string[] = [];
+if (process.env.FRONTEND_URL) {
+  corsOrigins.push(...process.env.FRONTEND_URL.split(",").map((o) => o.trim()));
+}
+if (!isProduction) {
+  corsOrigins.push("http://localhost:5000", "http://localhost:8080", "http://localhost:21604");
+}
+if (isProduction && corsOrigins.length === 0) {
+  throw new Error("FRONTEND_URL must be set in production for CORS.");
+}
+const corsOrigin = corsOrigins.length > 0 ? corsOrigins : false;
 app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
