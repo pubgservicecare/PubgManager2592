@@ -80,7 +80,7 @@ export function SellerDashboard() {
   };
 
   useEffect(() => {
-    if (!isLoading && !seller) setLocation("/seller/login");
+    if (!isLoading && !seller) setLocation("/");
   }, [seller, isLoading, setLocation]);
 
   const reload = async () => {
