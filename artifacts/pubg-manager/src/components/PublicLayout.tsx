@@ -313,7 +313,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
 
             {/* Bottom actions */}
             <div className="p-3 border-t border-border space-y-2">
-              {customer ? (
+              {customer || seller ? (
                 <button
                   onClick={() => setShowLogoutConfirm(true)}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 font-bold transition-colors"
