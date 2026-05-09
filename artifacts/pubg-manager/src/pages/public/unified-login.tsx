@@ -15,7 +15,7 @@ export function UnifiedLogin() {
 
   const [, setLocation] = useLocation();
   const { customer, refresh: refreshCustomer } = useCustomerAuth();
-  const { seller, refresh: refreshSeller } = useSellerAuth();
+  const { refresh: refreshSeller } = useSellerAuth();
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -23,11 +23,10 @@ export function UnifiedLogin() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // If already logged in, bounce to the appropriate dashboard.
+  // If already logged in as customer, bounce to marketplace.
   useEffect(() => {
-    if (seller) setLocation("/seller/dashboard");
-    else if (customer) setLocation("/");
-  }, [customer, seller, setLocation]);
+    if (customer) setLocation("/");
+  }, [customer, setLocation]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
