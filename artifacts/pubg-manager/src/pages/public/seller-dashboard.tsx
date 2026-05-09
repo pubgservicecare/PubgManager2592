@@ -77,7 +77,6 @@ export function SellerDashboard() {
   const handleLogout = async () => {
     await logout();
     setShowLogoutConfirm(false);
-    setLocation("/login");
   };
 
   useEffect(() => {

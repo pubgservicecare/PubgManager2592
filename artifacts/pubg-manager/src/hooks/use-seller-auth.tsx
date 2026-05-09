@@ -28,6 +28,7 @@ export function SellerAuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const refresh = async () => {
+    setIsLoading(true);
     try {
       const res = await fetch("/api/seller/me", { credentials: "include" });
       if (res.ok) {

@@ -24,6 +24,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const refresh = async () => {
+    setIsLoading(true);
     try {
       const res = await fetch("/api/customer/me", { credentials: "include" });
       setCustomer(res.ok ? await res.json() : null);
