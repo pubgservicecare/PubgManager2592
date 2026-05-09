@@ -372,11 +372,15 @@ async function downloadReceipt(req: Request, res: Response, _next: NextFunction)
   }
 
   const [settings] = await db.select().from(settingsTable).limit(1);
+  const proto = req.headers["x-forwarded-proto"] ?? req.protocol ?? "https";
+  const host  = req.headers["x-forwarded-host"] ?? req.headers.host ?? "";
+  const siteUrl = `${proto}://${String(host).split(",")[0].trim()}`;
   const business = {
-    siteName: settings?.siteName ?? "PUBG Account Manager",
-    supportEmail: settings?.supportEmail ?? "support@example.com",
-    whatsappNumber: settings?.whatsappNumber ?? "",
-    footerText: settings?.footerText ?? "",
+    siteName:      settings?.siteName       ?? "PUBG Account Manager",
+    supportEmail:  settings?.supportEmail   ?? "support@example.com",
+    whatsappNumber:settings?.whatsappNumber ?? "",
+    footerText:    settings?.footerText     ?? "",
+    siteUrl,
   };
 
   // Compute totals
@@ -438,11 +442,15 @@ router.get(
     }
 
     const [settings] = await db.select().from(settingsTable).limit(1);
+    const proto = req.headers["x-forwarded-proto"] ?? req.protocol ?? "https";
+    const host  = req.headers["x-forwarded-host"] ?? req.headers.host ?? "";
+    const siteUrl = `${proto}://${String(host).split(",")[0].trim()}`;
     const business = {
-      siteName: settings?.siteName ?? "PUBG Account Manager",
-      supportEmail: settings?.supportEmail ?? "support@example.com",
-      whatsappNumber: settings?.whatsappNumber ?? "",
-      footerText: settings?.footerText ?? "",
+      siteName:      settings?.siteName       ?? "PUBG Account Manager",
+      supportEmail:  settings?.supportEmail   ?? "support@example.com",
+      whatsappNumber:settings?.whatsappNumber ?? "",
+      footerText:    settings?.footerText     ?? "",
+      siteUrl,
     };
 
     const allPayments = await db.select().from(paymentsTable).where(eq(paymentsTable.accountId, account.id));

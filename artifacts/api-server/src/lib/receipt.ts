@@ -15,6 +15,7 @@ export interface ReceiptBusinessInput {
   supportEmail: string;
   whatsappNumber: string;
   footerText: string;
+  siteUrl: string;
 }
 
 export interface ReceiptTotalsInput {
@@ -23,26 +24,33 @@ export interface ReceiptTotalsInput {
   remaining: number;
 }
 
-const ORANGE = "#F59E0B";
-const DARK = "#0B0B0F";
-const MUTED = "#6B7280";
-const BORDER = "#E5E7EB";
+// ─── Colours ────────────────────────────────────────────────────────────────
+const AMBER   = "#F59E0B";
+const DARK    = "#111827";
+const WHITE   = "#FFFFFF";
+const MUTED   = "#6B7280";
+const LIGHT   = "#F3F4F6";
+const BORDER  = "#D1D5DB";
+const RED     = "#DC2626";
+const GREEN   = "#16A34A";
 
-function formatCurrency(n: number): string {
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function fmt(n: number): string {
   return new Intl.NumberFormat("en-PK", {
     style: "currency",
     currency: "PKR",
     minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   }).format(n);
 }
 
-function formatDate(d: Date | string | null): string {
-  if (!d) return "-";
+function fmtDate(d: Date | string | null): string {
+  if (!d) return "—";
   const date = typeof d === "string" ? new Date(d) : d;
   return date.toLocaleDateString("en-PK", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+// ─── Main generator ──────────────────────────────────────────────────────────
 export function generateReceiptPdf(opts: {
   payment: ReceiptPaymentInput;
   account: Account;
@@ -50,103 +58,183 @@ export function generateReceiptPdf(opts: {
   totals: ReceiptTotalsInput;
 }): NodeJS.ReadableStream {
   const { payment, account, business, totals } = opts;
-  const doc = new PDFDocument({ size: "A4", margin: 48 });
 
-  const pageWidth = doc.page.width - 96;
+  // ── Layout constants ──────────────────────────────────────────────────────
+  const PW       = 595;          // A4 width in points
+  const ML       = 40;           // left margin
+  const MR       = 40;           // right margin
+  const CW       = PW - ML - MR; // content width = 515
+  const HALF     = CW / 2;
 
-  // Header band
-  doc.rect(0, 0, doc.page.width, 96).fill(DARK);
-  doc.fillColor(ORANGE).fontSize(22).font("Helvetica-Bold").text(business.siteName.toUpperCase(), 48, 32);
-  doc.fillColor("#FFFFFF").fontSize(9).font("Helvetica").text("PAYMENT RECEIPT", 48, 62);
+  // Section heights (pre-calculated so we can set exact page height)
+  const H_HEADER  = 72;
+  const H_META    = 54;   // receipt # + date strip below header
+  const H_PARTIES = 68;   // buyer / account columns
+  const H_DIV     = 18;   // thin divider
+  const H_PAY_HDR = 18;
+  const H_ROW     = 20;
+  const NUM_ROWS  = 4;    // Amount, Date, Due, Note
+  const H_PAY     = H_PAY_HDR + NUM_ROWS * H_ROW + 10;
+  const H_SUM_HDR = 18;
+  const H_SUM_BOX = 80;
+  const H_SUM     = H_SUM_HDR + H_SUM_BOX + 10;
+  const H_FOOTER  = 56;
+  const H_PAD     = 16;   // top padding after header band
 
-  // Receipt number on right
-  doc.fillColor("#FFFFFF").fontSize(9).font("Helvetica").text(`Receipt #`, 48, 32, { align: "right", width: pageWidth });
-  doc.fillColor(ORANGE).fontSize(14).font("Helvetica-Bold").text(payment.receiptNumber, 48, 46, {
-    align: "right",
-    width: pageWidth,
-  });
-  doc.fillColor("#FFFFFF").fontSize(9).font("Helvetica").text(formatDate(payment.paidAt), 48, 66, {
-    align: "right",
-    width: pageWidth,
-  });
+  const PAGE_H = H_HEADER + H_META + H_PAD + H_PARTIES + H_DIV + H_PAY + H_SUM + H_FOOTER + 24;
 
-  doc.fillColor("#000000").moveDown(4);
+  const doc = new PDFDocument({ size: [PW, PAGE_H], margin: 0, autoFirstPage: true });
 
-  // Buyer + Account info two columns
-  const colTop = 128;
-  doc.fontSize(9).fillColor(MUTED).font("Helvetica-Bold").text("BUYER", 48, colTop);
-  doc.fontSize(11).fillColor("#000000").font("Helvetica-Bold").text(account.customerName || "—", 48, colTop + 14);
-  doc.fontSize(9).fillColor(MUTED).font("Helvetica").text(account.customerContact || "—", 48, colTop + 30);
+  // ── HEADER BAND ───────────────────────────────────────────────────────────
+  doc.rect(0, 0, PW, H_HEADER).fill(DARK);
 
-  const rightColX = 48 + pageWidth / 2;
-  doc.fontSize(9).fillColor(MUTED).font("Helvetica-Bold").text("ACCOUNT", rightColX, colTop);
-  doc.fontSize(11).fillColor("#000000").font("Helvetica-Bold").text(account.title, rightColX, colTop + 14, { width: pageWidth / 2 - 8 });
-  doc.fontSize(9).fillColor(MUTED).font("Helvetica").text(`ID: ${account.accountId}`, rightColX, colTop + 30);
+  // Site name (left)
+  doc.fillColor(AMBER).font("Helvetica-Bold").fontSize(18)
+     .text(business.siteName.toUpperCase(), ML, 18, { width: HALF, lineBreak: false });
 
-  // Divider
-  const dividerY = colTop + 70;
-  doc.strokeColor(BORDER).lineWidth(1).moveTo(48, dividerY).lineTo(48 + pageWidth, dividerY).stroke();
+  // "PAYMENT RECEIPT" badge (right-aligned)
+  const badgeW = 130;
+  const badgeX = PW - MR - badgeW;
+  doc.rect(badgeX, 14, badgeW, 20).fill(AMBER);
+  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8)
+     .text("PAYMENT RECEIPT", badgeX, 19, { width: badgeW, align: "center", lineBreak: false });
 
-  // Payment details box
-  const boxY = dividerY + 24;
-  doc.fontSize(9).fillColor(MUTED).font("Helvetica-Bold").text("PAYMENT DETAILS", 48, boxY);
+  // Website URL in header (left, below name)
+  doc.fillColor("#9CA3AF").font("Helvetica").fontSize(8)
+     .text(business.siteUrl, ML, 44, { lineBreak: false });
 
-  const tableY = boxY + 22;
-  const rowHeight = 22;
-  const labelX = 48;
-  const valueX = 48 + pageWidth / 2;
+  // ── META STRIP (light bg under header) ───────────────────────────────────
+  const metaY = H_HEADER;
+  doc.rect(0, metaY, PW, H_META).fill(LIGHT);
+
+  // Receipt # (left)
+  doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
+     .text("RECEIPT NO.", ML, metaY + 10, { lineBreak: false });
+  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(12)
+     .text(payment.receiptNumber, ML, metaY + 22, { lineBreak: false });
+
+  // Payment date (centre)
+  const midX = ML + HALF / 2;
+  doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
+     .text("DATE", midX, metaY + 10, { lineBreak: false });
+  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(11)
+     .text(fmtDate(payment.paidAt), midX, metaY + 22, { lineBreak: false });
+
+  // Amount (right)
+  doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
+     .text("AMOUNT PAID", ML + HALF, metaY + 10, { width: HALF, align: "right", lineBreak: false });
+  doc.fillColor(AMBER).font("Helvetica-Bold").fontSize(14)
+     .text(fmt(payment.amount), ML + HALF, metaY + 20, { width: HALF, align: "right", lineBreak: false });
+
+  // ── PARTIES ROW ───────────────────────────────────────────────────────────
+  const partiesY = metaY + H_META + H_PAD;
+
+  // Buyer (left col)
+  doc.fillColor(MUTED).font("Helvetica-Bold").fontSize(7.5)
+     .text("BUYER", ML, partiesY, { lineBreak: false });
+  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(11)
+     .text(account.customerName || "—", ML, partiesY + 12, { width: HALF - 12, lineBreak: false });
+  doc.fillColor(MUTED).font("Helvetica").fontSize(9)
+     .text(account.customerContact || "—", ML, partiesY + 27, { lineBreak: false });
+
+  // Vertical separator
+  const sepX = ML + HALF;
+  doc.strokeColor(BORDER).lineWidth(0.5)
+     .moveTo(sepX, partiesY).lineTo(sepX, partiesY + H_PARTIES - 12).stroke();
+
+  // Account (right col)
+  const rcX = sepX + 14;
+  doc.fillColor(MUTED).font("Helvetica-Bold").fontSize(7.5)
+     .text("PUBG ACCOUNT", rcX, partiesY, { lineBreak: false });
+  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(11)
+     .text(account.title, rcX, partiesY + 12, { width: HALF - 14, lineBreak: false });
+  doc.fillColor(MUTED).font("Helvetica").fontSize(9)
+     .text(`ID: ${account.accountId}`, rcX, partiesY + 27, { lineBreak: false });
+
+  // ── THIN DIVIDER ──────────────────────────────────────────────────────────
+  const divY = partiesY + H_PARTIES;
+  doc.strokeColor(BORDER).lineWidth(0.5)
+     .moveTo(ML, divY).lineTo(ML + CW, divY).stroke();
+
+  // ── PAYMENT DETAILS TABLE ─────────────────────────────────────────────────
+  const payY = divY + 10;
+  doc.fillColor(MUTED).font("Helvetica-Bold").fontSize(7.5)
+     .text("PAYMENT DETAILS", ML, payY, { lineBreak: false });
 
   const rows: Array<[string, string]> = [
-    ["Amount Received", formatCurrency(payment.amount)],
-    ["Payment Date", formatDate(payment.paidAt)],
-    ["Due Date", formatDate(payment.dueDate)],
-    ["Note", payment.note || "—"],
+    ["Amount Received",  fmt(payment.amount)],
+    ["Payment Date",     fmtDate(payment.paidAt)],
+    ["Due Date",         fmtDate(payment.dueDate)],
+    ["Note",             payment.note || "—"],
   ];
 
-  rows.forEach((row, i) => {
-    const y = tableY + i * rowHeight;
+  const tblY  = payY + H_PAY_HDR;
+  const valX  = ML + HALF;
+
+  rows.forEach(([label, value], i) => {
+    const rowY = tblY + i * H_ROW;
     if (i % 2 === 0) {
-      doc.rect(48, y - 4, pageWidth, rowHeight).fill("#F9FAFB");
+      doc.rect(ML, rowY - 2, CW, H_ROW).fill(LIGHT);
     }
-    doc.fillColor(MUTED).font("Helvetica").fontSize(10).text(row[0], labelX + 8, y);
-    doc.fillColor("#000000").font("Helvetica-Bold").fontSize(10).text(row[1], valueX, y, { width: pageWidth / 2 - 8 });
+    doc.fillColor(MUTED).font("Helvetica").fontSize(9)
+       .text(label, ML + 6, rowY + 2, { lineBreak: false });
+    doc.fillColor(DARK).font("Helvetica-Bold").fontSize(9)
+       .text(value, valX, rowY + 2, { width: HALF - 6, align: "right", lineBreak: false });
   });
 
-  // Totals summary
-  const totalsY = tableY + rows.length * rowHeight + 24;
-  doc.fontSize(9).fillColor(MUTED).font("Helvetica-Bold").text("INSTALLMENT SUMMARY", 48, totalsY);
+  // ── INSTALLMENT SUMMARY BOX ───────────────────────────────────────────────
+  const sumHeaderY = tblY + NUM_ROWS * H_ROW + 16;
+  doc.fillColor(MUTED).font("Helvetica-Bold").fontSize(7.5)
+     .text("INSTALLMENT SUMMARY", ML, sumHeaderY, { lineBreak: false });
 
-  const summaryY = totalsY + 22;
-  doc.rect(48, summaryY - 6, pageWidth, 86).fillAndStroke("#FFFBEB", ORANGE);
+  const boxY  = sumHeaderY + H_SUM_HDR;
+  const boxH  = H_SUM_BOX;
+  doc.rect(ML, boxY, CW, boxH).fillAndStroke("#FFFBEB", AMBER);
 
-  doc.fillColor(MUTED).font("Helvetica").fontSize(10).text("Total Sale Price", 60, summaryY + 4);
-  doc.fillColor("#000000").font("Helvetica-Bold").fontSize(11).text(formatCurrency(totals.totalPrice), 60, summaryY + 4, { align: "right", width: pageWidth - 24 });
+  const rowSpacing = 22;
 
-  doc.fillColor(MUTED).font("Helvetica").fontSize(10).text("Total Paid (incl. this)", 60, summaryY + 26);
-  doc.fillColor("#000000").font("Helvetica-Bold").fontSize(11).text(formatCurrency(totals.totalPaid), 60, summaryY + 26, { align: "right", width: pageWidth - 24 });
+  // Total Price
+  doc.fillColor(MUTED).font("Helvetica").fontSize(9)
+     .text("Total Sale Price", ML + 10, boxY + 10, { lineBreak: false });
+  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(10)
+     .text(fmt(totals.totalPrice), ML + 10, boxY + 10, { width: CW - 20, align: "right", lineBreak: false });
 
-  doc.fillColor(MUTED).font("Helvetica").fontSize(10).text("Remaining Balance", 60, summaryY + 52);
-  doc.fillColor(totals.remaining > 0 ? "#DC2626" : "#16A34A").font("Helvetica-Bold").fontSize(13).text(formatCurrency(totals.remaining), 60, summaryY + 50, { align: "right", width: pageWidth - 24 });
+  // Total Paid
+  doc.fillColor(MUTED).font("Helvetica").fontSize(9)
+     .text("Total Paid (incl. this)", ML + 10, boxY + 10 + rowSpacing, { lineBreak: false });
+  doc.fillColor(GREEN).font("Helvetica-Bold").fontSize(10)
+     .text(fmt(totals.totalPaid), ML + 10, boxY + 10 + rowSpacing, { width: CW - 20, align: "right", lineBreak: false });
 
-  // Footer
-  const footerY = doc.page.height - 100;
-  doc.strokeColor(BORDER).lineWidth(1).moveTo(48, footerY).lineTo(48 + pageWidth, footerY).stroke();
-  doc.fillColor(MUTED).font("Helvetica").fontSize(8).text(
-    "This is a computer-generated receipt. No signature required.",
-    48,
-    footerY + 12,
-    { align: "center", width: pageWidth }
-  );
-  doc.fillColor(MUTED).font("Helvetica").fontSize(8).text(
-    `Support: ${business.supportEmail}  •  WhatsApp: ${business.whatsappNumber}`,
-    48,
-    footerY + 28,
-    { align: "center", width: pageWidth }
-  );
-  doc.fillColor(MUTED).font("Helvetica-Oblique").fontSize(7).text(business.footerText, 48, footerY + 50, {
-    align: "center",
-    width: pageWidth,
-  });
+  // Remaining — bold and coloured
+  doc.strokeColor(AMBER).lineWidth(0.5)
+     .moveTo(ML + 10, boxY + 10 + rowSpacing * 2 - 4)
+     .lineTo(ML + CW - 10, boxY + 10 + rowSpacing * 2 - 4).stroke();
+  doc.fillColor(MUTED).font("Helvetica-Bold").fontSize(9)
+     .text("Remaining Balance", ML + 10, boxY + 10 + rowSpacing * 2 + 2, { lineBreak: false });
+  doc.fillColor(totals.remaining > 0 ? RED : GREEN).font("Helvetica-Bold").fontSize(13)
+     .text(fmt(totals.remaining), ML + 10, boxY + 6 + rowSpacing * 2, { width: CW - 20, align: "right", lineBreak: false });
+
+  // ── FOOTER ────────────────────────────────────────────────────────────────
+  const footerY = boxY + boxH + 14;
+  doc.rect(0, footerY, PW, H_FOOTER + 10).fill(DARK);
+
+  // Left: contact info
+  doc.fillColor("#9CA3AF").font("Helvetica").fontSize(7.5)
+     .text(`Email: ${business.supportEmail}`, ML, footerY + 10, { lineBreak: false });
+  if (business.whatsappNumber) {
+    doc.fillColor("#9CA3AF").font("Helvetica").fontSize(7.5)
+       .text(`WhatsApp: ${business.whatsappNumber}`, ML, footerY + 22, { lineBreak: false });
+  }
+
+  // Right: website
+  doc.fillColor(AMBER).font("Helvetica-Bold").fontSize(9)
+     .text(business.siteUrl, ML, footerY + 10, { width: CW, align: "right", lineBreak: false });
+
+  // Centre: disclaimer
+  doc.fillColor("#6B7280").font("Helvetica").fontSize(7)
+     .text("This is a computer-generated receipt. No signature required.", ML, footerY + 36, {
+       width: CW, align: "center", lineBreak: false,
+     });
 
   doc.end();
   return doc as unknown as NodeJS.ReadableStream;
