@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: pubg-account-manager-api
+    name: pubg-api
     runtime: node
     plan: free
-    buildCommand: npm install -g pnpm@latest && pnpm install && pnpm --filter @workspace/api-server run build
+    buildCommand: chmod +x render-build.sh && ./render-build.sh
     startCommand: node --enable-source-maps ./artifacts/api-server/dist/index.mjs
     envVars:
       - key: NODE_ENV
@@ -15,4 +15,8 @@ services:
       - key: SESSION_SECRET
         generateValue: true
       - key: FRONTEND_URL
+        sync: false
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
         sync: false
