@@ -1,0 +1,70 @@
+==> Downloading cache...
+==> Cloning from https://github.com/pubgservicecare/PubgManager2592
+==> Checking out commit 1ffb125e63531c371ccfdbe897136bb522a0da60 in branch main
+==> Downloaded 147MB in 2s. Extraction took 4s.
+==> Using Node.js version 20.18.0 via /opt/render/project/src/.node-version
+==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+==> Running build command 'chmod +x render-build.sh && ./render-build.sh'...
+Node version: v20.18.0
+npm version: 10.8.2
+changed 1 package in 936ms
+1 package is looking for funding
+  run `npm fund` for details
+pnpm version: 10.33.4
+> @workspace/api-server@0.0.0 build /opt/render/project/src/artifacts/api-server
+> node ./build.mjs
+  dist/index.mjs                       4.8mb ⚠️
+  dist/pino-worker.mjs               153.4kb
+  dist/pino-file.mjs                 142.1kb
+  dist/pino-pretty.mjs               114.6kb
+  dist/thread-stream-worker.mjs        7.3kb
+  dist/index.mjs.map                   7.8mb
+  dist/pino-worker.mjs.map           256.9kb
+  dist/pino-file.mjs.map             229.0kb
+  dist/pino-pretty.mjs.map           203.9kb
+  dist/thread-stream-worker.mjs.map   12.0kb
+⚡ Done in 673ms
+> @workspace/pubg-manager@0.0.0 build /opt/render/project/src/artifacts/pubg-manager
+> vite build --config vite.config.ts
+You are using Node.js 20.18.0. Vite requires Node.js version 20.19+ or 22.12+. Please upgrade your Node.js version.
+vite v7.3.2 building client environment for production...
+transforming...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 3198 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/public/index.html                     2.79 kB │ gzip:   1.03 kB
+dist/public/assets/index-NBMxAFCh.css    193.42 kB │ gzip:  27.13 kB
+dist/public/assets/index-D_QgoxrN.js   1,247.20 kB │ gzip: 351.20 kB
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.83s
+Build complete!
+==> Uploading build...
+==> Uploaded in 4.9s. Compression took 5.9s
+==> Build successful 🎉
+==> Deploying...
+==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+==> Running 'node --enable-source-maps ./artifacts/api-server/dist/index.mjs'
+/opt/render/project/src/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:225
+      throw new PathError(`Missing parameter name at index ${index}`, str);
+            ^
+PathError [TypeError]: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+    at name (/opt/render/project/src/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:225:13)
+    at parse (/opt/render/project/src/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:242:62)
+    at pathToRegexp (/opt/render/project/src/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:480:54)
+    at Object.match (/opt/render/project/src/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:438:28)
+    at matcher (/opt/render/project/src/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:86:23)
+    at new Layer (/opt/render/project/src/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:93:62)
+    at Function.route (/opt/render/project/src/node_modules/.pnpm/router@2.2.0/node_modules/router/index.js:428:17)
+    at Function.route (/opt/render/project/src/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:257:22)
+    at Function.app2.<computed> (/opt/render/project/src/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:478:22)
+    at <anonymous> (/opt/render/project/src/artifacts/api-server/src/app.ts:97:7) {
+  originalPath: '*'
+}
+Node.js v20.18.0
+==> Exited with status 1
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
