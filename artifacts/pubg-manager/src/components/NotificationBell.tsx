@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { apiUrl } from "@/lib/api-url";
 import { Bell, X, Check } from "lucide-react";
 import { useCustomerAuth } from "@/hooks/use-customer-auth";
 
@@ -29,7 +30,7 @@ export function NotificationBell() {
     let cancelled = false;
     const fetchUnread = async () => {
       try {
-        const r = await fetch("/api/customer/notifications/unread-count", { credentials: "include" });
+        const r = await fetch(apiUrl("/api/customer/notifications/unread-count"), { credentials: "include" });
         if (!r.ok) {
           if (r.status === 401) refresh();
           return;
@@ -48,14 +49,14 @@ export function NotificationBell() {
 
   useEffect(() => {
     if (!open || !customer) return;
-    fetch("/api/customer/notifications", { credentials: "include" })
+    fetch(apiUrl("/api/customer/notifications"), { credentials: "include" })
       .then((r) => (r.ok ? r.json() : { items: [] }))
       .then((data) => setItems(Array.isArray(data.items) ? data.items.map((n: any) => ({ ...n, isRead: n.read })) : []))
       .catch(() => {});
   }, [open, customer]);
 
   const markAllRead = async () => {
-    await fetch("/api/customer/notifications/mark-all-read", {
+    await fetch(apiUrl("/api/customer/notifications/mark-all-read"), {
       method: "POST",
       credentials: "include",
     });
@@ -65,7 +66,7 @@ export function NotificationBell() {
 
   const handleClick = async (n: Notif) => {
     if (!n.isRead) {
-      await fetch(`/api/customer/notifications/${n.id}/read`, {
+      await fetch(apiUrl(`/api/customer/notifications/${n.id}/read`), {
         method: "PATCH",
         credentials: "include",
       });

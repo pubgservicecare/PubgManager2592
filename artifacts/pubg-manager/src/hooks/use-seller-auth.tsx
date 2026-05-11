@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { apiUrl } from "@/lib/api-url";
 
 interface SellerUser {
   id: number;
@@ -30,7 +31,7 @@ export function SellerAuthProvider({ children }: { children: ReactNode }) {
   const refresh = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/seller/me", { credentials: "include" });
+      const res = await fetch(apiUrl("/api/seller/me"), { credentials: "include" });
       if (res.ok) {
         setSeller(await res.json());
       } else {
@@ -48,7 +49,7 @@ export function SellerAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const res = await fetch("/api/seller/login", {
+    const res = await fetch(apiUrl("/api/seller/login"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -62,7 +63,7 @@ export function SellerAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await fetch("/api/seller/logout", { method: "POST", credentials: "include" });
+    await fetch(apiUrl("/api/seller/logout"), { method: "POST", credentials: "include" });
     setSeller(null);
     await refresh();
   };

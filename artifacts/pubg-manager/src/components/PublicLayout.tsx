@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { apiUrl } from "@/lib/api-url";
 import {
   Gamepad2,
   ShoppingCart,
@@ -53,7 +54,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
     if (becomingSeller) return;
     setBecomingSeller(true);
     try {
-      const res = await fetch("/api/customer/become-seller", {
+      const res = await fetch(apiUrl("/api/customer/become-seller"), {
         method: "POST",
         credentials: "include",
       });

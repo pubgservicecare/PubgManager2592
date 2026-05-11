@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
+import { apiUrl } from "@/lib/api-url";
 import { useListAccounts, ListAccountsStatus, getListAccountsQueryKey } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -91,7 +92,7 @@ export function AdminAccountsList() {
     }
     setBulkBusy(true);
     try {
-      const res = await fetch("/api/accounts/bulk", {
+      const res = await fetch(apiUrl("/api/accounts/bulk"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

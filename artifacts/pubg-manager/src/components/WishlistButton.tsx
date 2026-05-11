@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Heart, Loader2 } from "lucide-react";
+import { apiUrl } from "@/lib/api-url";
 import { useCustomerAuth } from "@/hooks/use-customer-auth";
 import { useLocation } from "wouter";
 
@@ -9,7 +10,7 @@ const subscribers = new Set<(s: Set<number>) => void>();
 async function loadWishlistIds(force = false): Promise<Set<number>> {
   if (cachedIds && !force) return cachedIds;
   try {
-    const r = await fetch("/api/wishlist/ids", { credentials: "include" });
+    const r = await fetch(apiUrl("/api/wishlist/ids"), { credentials: "include" });
     if (r.ok) {
       const ids: number[] = await r.json();
       cachedIds = new Set(ids);
@@ -71,13 +72,13 @@ export function WishlistButton({
     setBusy(true);
     try {
       if (inWishlist) {
-        await fetch(`/api/wishlist/${accountId}`, {
+        await fetch(apiUrl(`/api/wishlist/${accountId}`), {
           method: "DELETE",
           credentials: "include",
         });
         cachedIds?.delete(accountId);
       } else {
-        await fetch("/api/wishlist", {
+        await fetch(apiUrl("/api/wishlist"), {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { apiUrl } from "@/lib/api-url";
 import { AdminLayout } from "@/components/AdminLayout";
 import { Store, Eye, Clock, CheckCircle, XCircle, Ban, Loader2 } from "lucide-react";
 
@@ -32,7 +33,7 @@ export function AdminSellersList() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/sellers", { credentials: "include" });
+      const res = await fetch(apiUrl("/api/admin/sellers"), { credentials: "include" });
       if (!res.ok) {
         setSellers([]);
         return;

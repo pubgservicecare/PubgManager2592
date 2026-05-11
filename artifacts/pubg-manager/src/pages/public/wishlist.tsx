@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { apiUrl } from "@/lib/api-url";
 import { PublicLayout } from "@/components/PublicLayout";
 import { useCustomerAuth } from "@/hooks/use-customer-auth";
 import { useSEO } from "@/hooks/use-seo";
@@ -34,7 +35,7 @@ export function WishlistPage() {
   }, [customer, isLoading, setLocation]);
 
   const reload = async () => {
-    const r = await fetch("/api/wishlist", { credentials: "include" });
+    const r = await fetch(apiUrl("/api/wishlist"), { credentials: "include" });
     if (r.ok) setItems(await r.json());
   };
 
@@ -45,7 +46,7 @@ export function WishlistPage() {
   const remove = async (accId: number) => {
     setRemoving(accId);
     try {
-      await fetch(`/api/wishlist/${accId}`, {
+      await fetch(apiUrl(`/api/wishlist/${accId}`), {
         method: "DELETE",
         credentials: "include",
       });

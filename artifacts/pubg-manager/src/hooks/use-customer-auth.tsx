@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { apiUrl } from "@/lib/api-url";
 
 interface CustomerUser {
   id: number;
@@ -26,7 +27,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const refresh = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/customer/me", { credentials: "include" });
+      const res = await fetch(apiUrl("/api/customer/me"), { credentials: "include" });
       setCustomer(res.ok ? await res.json() : null);
     } catch {
       setCustomer(null);
@@ -40,7 +41,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signup = async (name: string, phone: string, password: string, referralCode?: string) => {
-    const res = await fetch("/api/customer/signup", {
+    const res = await fetch(apiUrl("/api/customer/signup"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -55,7 +56,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (phone: string, password: string) => {
-    const res = await fetch("/api/customer/login", {
+    const res = await fetch(apiUrl("/api/customer/login"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -70,7 +71,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await fetch("/api/customer/logout", { method: "POST", credentials: "include" });
+    await fetch(apiUrl("/api/customer/logout"), { method: "POST", credentials: "include" });
     setCustomer(null);
   };
 

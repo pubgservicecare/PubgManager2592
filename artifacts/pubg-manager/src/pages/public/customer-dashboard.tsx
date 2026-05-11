@@ -1,5 +1,6 @@
 import { useLocation } from "wouter";
 import { useEffect, useState } from "react";
+import { apiUrl } from "@/lib/api-url";
 import { useCustomerAuth } from "@/hooks/use-customer-auth";
 import { useGetSettings } from "@workspace/api-client-react";
 import { PublicLayout } from "@/components/PublicLayout";
@@ -73,7 +74,7 @@ export function CustomerDashboard() {
   useEffect(() => {
     if (!customer) return;
     const fetchStatus = () => {
-      fetch("/api/customer/chat-status", { credentials: "include" })
+      fetch(apiUrl("/api/customer/chat-status"), { credentials: "include" })
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => setChatStatus(data))
         .catch(() => {});
@@ -85,17 +86,17 @@ export function CustomerDashboard() {
 
   useEffect(() => {
     if (!customer) return;
-    fetch("/api/customer/referral", { credentials: "include" })
+    fetch(apiUrl("/api/customer/referral"), { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setReferral(d))
       .catch(() => {});
 
-    fetch("/api/customer/installments", { credentials: "include" })
+    fetch(apiUrl("/api/customer/installments"), { credentials: "include" })
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => setInstallments(Array.isArray(d) ? d : []))
       .catch(() => setInstallments([]));
 
-    fetch("/api/customer/wishlist", { credentials: "include" })
+    fetch(apiUrl("/api/customer/wishlist"), { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (Array.isArray(d)) setWishlistCount(d.length);

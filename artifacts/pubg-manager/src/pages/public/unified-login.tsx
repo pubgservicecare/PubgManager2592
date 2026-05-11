@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { apiUrl } from "@/lib/api-url";
 import { PublicLayout } from "@/components/PublicLayout";
 import { useSEO } from "@/hooks/use-seo";
 import { useCustomerAuth } from "@/hooks/use-customer-auth";
@@ -33,7 +34,7 @@ export function UnifiedLogin() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(apiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

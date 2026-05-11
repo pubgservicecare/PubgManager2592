@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { apiUrl } from "@/lib/api-url";
 import { PublicLayout } from "@/components/PublicLayout";
 import { useSEO } from "@/hooks/use-seo";
 import { useSellerAuth } from "@/hooks/use-seller-auth";
@@ -87,8 +88,8 @@ export function SellerDashboard() {
     setLoading(true);
     try {
       const [sRes, aRes] = await Promise.all([
-        fetch("/api/seller/dashboard", { credentials: "include" }),
-        fetch("/api/seller/accounts", { credentials: "include" }),
+        fetch(apiUrl("/api/seller/dashboard"), { credentials: "include" }),
+        fetch(apiUrl("/api/seller/accounts"), { credentials: "include" }),
       ]);
       if (sRes.ok) {
         const s = await sRes.json();
@@ -513,7 +514,7 @@ function UsernameCard({ seller }: { seller: { username?: string | null } }) {
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/seller/username", {
+      const res = await fetch(apiUrl("/api/seller/username"), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

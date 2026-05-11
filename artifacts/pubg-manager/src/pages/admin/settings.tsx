@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
+import { apiUrl } from "@/lib/api-url";
 import { useGetSettings, useUpdateSettings } from "@workspace/api-client-react";
 import { useState, useEffect } from "react";
 import {
@@ -180,7 +181,7 @@ export function AdminSettings() {
   const handleTestConnection = async () => {
     setTestingConnection(true);
     try {
-      const res = await fetch("/api/storage/test-connection", { method: "POST" });
+      const res = await fetch(apiUrl("/api/storage/test-connection"), { method: "POST" });
       const data = await res.json();
       if (data.ok) {
         toast({ title: "Connection Successful", description: data.message || "Storage is working correctly.", variant: "default" });

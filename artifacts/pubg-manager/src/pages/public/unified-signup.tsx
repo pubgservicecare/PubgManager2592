@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { apiUrl } from "@/lib/api-url";
 import { PublicLayout } from "@/components/PublicLayout";
 import { FileUploadField } from "@/components/FileUploadField";
 import { useSEO } from "@/hooks/use-seo";
@@ -346,7 +347,7 @@ function SellerSignupForm({ prefillName, prefillPhone }: { prefillName: string; 
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/seller/signup", {
+      const res = await fetch(apiUrl("/api/seller/signup"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
