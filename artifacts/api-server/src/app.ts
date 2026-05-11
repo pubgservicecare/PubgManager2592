@@ -6,6 +6,10 @@ import connectPgSimple from "connect-pg-simple";
 import { pool } from "@workspace/db";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app: Express = express();
 
@@ -47,9 +51,6 @@ if (!isProduction) {
 if (isReplit && process.env.REPLIT_DEV_DOMAIN) {
   corsOrigins.push(`https://${process.env.REPLIT_DEV_DOMAIN}`);
 }
-if (isProduction && corsOrigins.length === 0) {
-  throw new Error("FRONTEND_URL must be set in production for CORS.");
-}
 const corsOrigin = corsOrigins.length > 0 ? corsOrigins : false;
 
 app.set("trust proxy", 1);
@@ -86,5 +87,16 @@ app.use("/api", (_req, res, next) => {
   next();
 });
 app.use("/api", router);
+
+// In production, serve the built frontend from the same Express server.
+// This makes everything same-origin — no CORS, no cross-origin cookie issues.
+if (isProduction) {
+  const frontendDist = path.resolve(__dirname, "../../pubg-manager/dist/public");
+  app.use(express.static(frontendDist, { index: false }));
+  // SPA fallback — all non-API routes serve index.html
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(frontendDist, "index.html"));
+  });
+}
 
 export default app;

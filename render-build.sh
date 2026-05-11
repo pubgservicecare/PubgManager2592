@@ -15,4 +15,8 @@ pnpm install --no-frozen-lockfile
 # Build the API server
 pnpm --filter @workspace/api-server run build
 
+# Build the frontend (served by the API server in production)
+# No VITE_API_URL = relative /api paths = same-origin, no CORS issues
+pnpm --filter @workspace/pubg-manager run build
+
 echo "Build complete!"

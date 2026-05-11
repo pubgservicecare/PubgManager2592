@@ -15,7 +15,7 @@ services:
       - key: SESSION_SECRET
         generateValue: true
       - key: FRONTEND_URL
-        sync: false
+        value: https://pubg-api-ovgh.onrender.com
       - key: ADMIN_USERNAME
         value: admin
       - key: ADMIN_PASSWORD
