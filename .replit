@@ -92,6 +92,5 @@ channel = "stable-25_05"
 [userenv.shared]
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"
-FRONTEND_URL = "https://03f64495-719e-42dd-88ce-5578d19ff405-00-2gx4p5sdh9h7k.sisko.replit.dev"
 
 [userenv.development]
