@@ -30,17 +30,30 @@ app.use(
 );
 
 const isProduction = process.env.NODE_ENV === "production";
+const isReplit = !!process.env.REPL_ID;
+const useSecureCookies = isProduction || isReplit;
+
 const corsOrigins: string[] = [];
 if (process.env.FRONTEND_URL) {
   corsOrigins.push(...process.env.FRONTEND_URL.split(",").map((o) => o.trim()));
 }
 if (!isProduction) {
-  corsOrigins.push("http://localhost:5000", "http://localhost:8080", "http://localhost:21604");
+  corsOrigins.push(
+    "http://localhost:5000",
+    "http://localhost:8080",
+    "http://localhost:21604",
+  );
+}
+if (isReplit && process.env.REPLIT_DEV_DOMAIN) {
+  corsOrigins.push(`https://${process.env.REPLIT_DEV_DOMAIN}`);
 }
 if (isProduction && corsOrigins.length === 0) {
   throw new Error("FRONTEND_URL must be set in production for CORS.");
 }
 const corsOrigin = corsOrigins.length > 0 ? corsOrigins : false;
+
+app.set("trust proxy", 1);
+
 app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -60,15 +73,13 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: isProduction,
+      secure: useSecureCookies,
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: isProduction ? "none" : "lax",
+      sameSite: useSecureCookies ? "none" : "lax",
     },
   })
 );
-
-app.set("trust proxy", 1);
 
 app.use("/api", (_req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
