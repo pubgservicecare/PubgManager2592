@@ -1,0 +1,71 @@
+I want you to fully take over debugging and stabilizing my production project.
+
+Project Name:
+PUBG Market
+
+GitHub Repository:
+https://github.com/pubgservicecare/PubgManager2592
+
+Production Frontend URL:
+https://pubg-market.pages.dev
+
+Production Backend URL:
+https://pubg-api-ovgh.onrender.com
+
+Stack:
+
+* React + Vite frontend
+* Node.js + Express 5 backend
+* PostgreSQL (Neon DB)
+* Cloudflare Pages frontend hosting
+* Render backend hosting
+* pnpm monorepo/workspace project
+
+Important:
+This project has recurring production issues such as:
+
+* Admin login issues
+* Seller login issues
+* Customer signup issues
+* Session/authentication issues
+* CORS issues
+* Express 5 routing issues
+* API response issues
+* Deployment/build issues
+
+Some issues were fixed temporarily but new issues keep appearing.
+
+I want you to:
+
+* Audit the full frontend and backend architecture
+* Review all authentication flows
+* Review all API routes
+* Review all middleware
+* Review session/cookie handling
+* Review CORS configuration
+* Review Express 5 compatibility
+* Review deployment configs
+* Review production environment variables
+* Review frontend API handling
+* Review database connections
+* Review route registration order
+* Review error handling everywhere
+* Review all fetch/axios requests
+* Review Render and Cloudflare deployment compatibility
+
+Main Goal:
+Make the entire production system stable and production-ready so random authentication/API issues stop happening repeatedly.
+
+Requirements:
+
+* Fix root causes instead of temporary patches
+* Add proper centralized error handling
+* Ensure all APIs return proper JSON
+* Ensure login/signup flows work reliably
+* Ensure sessions persist correctly in production
+* Ensure CORS/preflight always works
+* Ensure frontend handles API failures safely
+* Ensure Express 5 compatible routing everywhere
+* Improve production reliability overall
+
+Please inspect the whole project carefully and continue handling it from here like a production debugging and stabilization task.
