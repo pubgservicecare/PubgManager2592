@@ -110,6 +110,14 @@ export default defineConfig({
           "x-forwarded-proto": "https",
         },
       },
+      "/health": {
+        target: apiTarget,
+        changeOrigin: true,
+        secure: false,
+        headers: {
+          "x-forwarded-proto": "https",
+        },
+      },
     },
   },
   preview: {

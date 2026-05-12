@@ -1,9 +1,9 @@
 import { Link } from "wouter";
 import { AdminLayout } from "@/components/AdminLayout";
 import { useGetDashboard } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/helpers";
 import {
-  DollarSign,
   Gamepad2,
   TrendingUp,
   TrendingDown,
@@ -19,6 +19,11 @@ import {
   Layers,
   AlertTriangle,
   CalendarClock,
+  Server,
+  Cpu,
+  RefreshCw,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { formatDate } from "@/lib/helpers";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
@@ -153,6 +158,11 @@ export function AdminDashboard() {
         <MetricTile icon={CheckCircle2} label="Active" value={stats.activeAccounts} color="emerald" />
         <MetricTile icon={Layers} label="Sold" value={stats.soldAccounts} color="blue" />
         <MetricTile icon={Clock} label="Installment" value={stats.installmentAccounts} color="amber" />
+      </div>
+
+      {/* Server Status Widget */}
+      <div className="mb-4">
+        <ServerStatusWidget />
       </div>
 
       {/* Bottom grid: chart + action queue */}
@@ -472,6 +482,173 @@ function ActionItem({
         </div>
       </div>
     </Link>
+  );
+}
+
+function formatUptime(seconds: number): string {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+type HealthData = {
+  success: boolean;
+  message: string;
+  uptime: number;
+  timestamp: string;
+};
+
+function ServerStatusWidget() {
+  const { data, isLoading, isError, dataUpdatedAt, refetch, isFetching } =
+    useQuery<HealthData>({
+      queryKey: ["server-health"],
+      queryFn: async () => {
+        const res = await fetch("/health");
+        if (!res.ok) throw new Error("Server unhealthy");
+        return res.json();
+      },
+      refetchInterval: 30_000,
+      retry: 1,
+    });
+
+  const online = !isError && !!data?.success;
+  const lastChecked = dataUpdatedAt
+    ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : null;
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-5 sm:p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2 mb-5">
+        <div className="flex items-center gap-2">
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-300 flex items-center justify-center">
+            <Server className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="text-base font-display font-bold text-white tracking-wider">
+              SERVER STATUS
+            </h3>
+            <p className="text-[11px] text-muted-foreground">
+              Render backend · auto-refresh every 30s
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="p-2 rounded-xl text-muted-foreground hover:text-white hover:bg-secondary transition disabled:opacity-40"
+          title="Refresh now"
+        >
+          <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+
+      {/* Stat tiles */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Online / Offline */}
+        <div className="bg-secondary/30 border border-border rounded-xl p-4 flex items-center gap-3">
+          <div
+            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+              isLoading
+                ? "bg-secondary/50 text-muted-foreground"
+                : online
+                ? "bg-emerald-500/15 text-emerald-300"
+                : "bg-destructive/15 text-destructive"
+            }`}
+          >
+            {online ? <Wifi className="w-5 h-5" /> : <WifiOff className="w-5 h-5" />}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Status</p>
+            {isLoading ? (
+              <div className="h-5 w-16 bg-secondary/60 rounded animate-pulse mt-1" />
+            ) : (
+              <p
+                className={`text-lg font-display font-black ${
+                  online ? "text-emerald-300" : "text-destructive"
+                }`}
+              >
+                {online ? "ONLINE" : "DOWN"}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Uptime */}
+        <div className="bg-secondary/30 border border-border rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-300 flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Uptime</p>
+            {isLoading ? (
+              <div className="h-5 w-20 bg-secondary/60 rounded animate-pulse mt-1" />
+            ) : online && data ? (
+              <p className="text-lg font-display font-black text-white">{formatUptime(data.uptime)}</p>
+            ) : (
+              <p className="text-lg font-display font-black text-muted-foreground/50">—</p>
+            )}
+          </div>
+        </div>
+
+        {/* Memory */}
+        <div className="bg-secondary/30 border border-border rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+            <Cpu className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Memory</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Via /api/healthz log</p>
+          </div>
+        </div>
+
+        {/* Last Checked */}
+        <div className="bg-secondary/30 border border-border rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center shrink-0">
+            <Activity className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Last Check</p>
+            {lastChecked ? (
+              <p className="text-sm font-display font-bold text-white">{lastChecked}</p>
+            ) : (
+              <div className="h-5 w-16 bg-secondary/60 rounded animate-pulse mt-1" />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Status bar */}
+      <div
+        className={`mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold ${
+          isLoading
+            ? "bg-secondary/30 text-muted-foreground"
+            : online
+            ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
+            : "bg-destructive/10 text-destructive border border-destructive/20"
+        }`}
+      >
+        <span
+          className={`w-2 h-2 rounded-full shrink-0 ${
+            isLoading
+              ? "bg-muted-foreground animate-pulse"
+              : online
+              ? "bg-emerald-400 animate-pulse"
+              : "bg-destructive"
+          }`}
+        />
+        {isLoading
+          ? "Checking server status…"
+          : online
+          ? `Server is alive · Render backend responding normally · Next check in ~30s`
+          : "Server is not responding — may be cold-starting or down"}
+      </div>
+    </div>
   );
 }
 
