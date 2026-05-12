@@ -1,0 +1,85 @@
+My authentication system works on desktop/computer browsers but fails on mobile devices. Users can sign up, but on mobile login either fails, session is not created, cookies are missing, or requests are rejected.
+
+Please fully debug and fix the backend + frontend auth flow for mobile browsers.
+
+Check ALL of these carefully:
+
+1. Cookie Configuration
+- Ensure cookies work on Android + iPhone browsers.
+- Fix SameSite and Secure settings.
+- In production use:
+  secure: true
+  sameSite: "none"
+- Ensure credentials are enabled.
+
+Example:
+app.use(cors({
+  origin: FRONTEND_URL,
+  credentials: true
+}))
+
+session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: true,
+    httpOnly: true,
+    sameSite: "none",
+    maxAge: 1000 * 60 * 60 * 24 * 7
+  }
+})
+
+2. Frontend Requests
+- Ensure ALL axios/fetch requests include credentials.
+
+Axios:
+axios.defaults.withCredentials = true
+
+OR:
+axios.post(url, data, {
+  withCredentials: true
+})
+
+Fetch:
+fetch(url, {
+  credentials: "include"
+})
+
+3. CORS Fix
+- Do NOT use origin: "*"
+- Use exact frontend domain.
+- Ensure Render backend allows frontend domain.
+
+4. HTTPS Issues
+- Mobile browsers block insecure cookies.
+- Ensure frontend and backend both use HTTPS URLs only.
+- Remove all localhost URLs from production.
+
+5. Password Verification
+- Verify bcrypt compare works correctly.
+- Check login controller logic carefully.
+- Ensure hashed passwords are stored correctly.
+
+6. Session Persistence
+- Ensure session store works in production.
+- Check express-session configuration.
+- Verify cookies are actually sent on mobile.
+
+7. Debugging
+- Add detailed logs for:
+  - login request
+  - password compare result
+  - session creation
+  - cookie sending
+  - auth middleware
+
+8. Deployment
+Backend is deployed on Render.
+Frontend and backend are separate domains.
+
+9. Final Requirement
+- Fully fix mobile login issue.
+- Provide final corrected backend and frontend code.
+- Explain exactly what was broken.
+- Ensure Android Chrome + iPhone Safari compatibility.

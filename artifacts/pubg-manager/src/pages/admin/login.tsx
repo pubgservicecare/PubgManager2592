@@ -75,6 +75,9 @@ export function AdminLogin() {
                 value={username}
                 onChange={e => setUsername(e.target.value)}
                 className="w-full bg-background border-2 border-border focus:border-primary rounded-xl pl-12 pr-4 py-3 text-white outline-none transition-colors"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
                 required
               />
             </div>
@@ -89,6 +92,7 @@ export function AdminLogin() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 className="w-full bg-background border-2 border-border focus:border-primary rounded-xl pl-12 pr-4 py-3 text-white outline-none transition-colors"
+                autoComplete="current-password"
                 required
               />
             </div>

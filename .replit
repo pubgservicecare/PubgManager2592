@@ -33,7 +33,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "fuser -k 8080/tcp 2>/dev/null || true; sleep 1; PORT=8080 pnpm --filter @workspace/api-server run dev"
+args = "fuser -k 8080/tcp 2>/dev/null || true; sleep 4; fuser -k 8080/tcp 2>/dev/null || true; sleep 1; PORT=8080 pnpm --filter @workspace/api-server run dev"
 waitForPort = 8080
 
 [[workflows.workflow]]
@@ -59,6 +59,10 @@ timeoutMs = 20000
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3002
 
 [[ports]]
 localPort = 8080

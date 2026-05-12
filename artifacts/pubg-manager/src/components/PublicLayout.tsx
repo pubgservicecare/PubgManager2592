@@ -35,6 +35,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
   const { seller, isLoading: sellerLoading, refresh: refreshSeller, logout: logoutSeller } = useSellerAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [becomingSeller, setBecomingSeller] = useState(false);
+  const [becomingSellerError, setBecomingSellerError] = useState("");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleLogoutConfirm = async () => {
@@ -71,9 +72,9 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
         return;
       }
       // Pending/rejected/suspended — surface to the user
-      alert(data.message || "Your seller account is unavailable right now.");
+      setBecomingSellerError(data.message || "Your seller account is unavailable right now.");
     } catch {
-      alert("Something went wrong. Please try again.");
+      setBecomingSellerError("Something went wrong. Please try again.");
     } finally {
       setBecomingSeller(false);
     }
@@ -84,10 +85,24 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
     setMobileOpen(false);
   }, [location]);
 
-  // Lock body scroll when mobile menu is open
+  // Lock body scroll when mobile menu is open.
+  // iOS Safari ignores overflow:hidden on body — must use position:fixed
+  // with the current scroll offset saved so we can restore it on close.
   useEffect(() => {
-    document.body.style.overflow = mobileOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    if (!mobileOpen) return;
+    const scrollY = window.scrollY;
+    const body = document.body;
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
+    return () => {
+      body.style.overflow = "";
+      body.style.position = "";
+      body.style.top = "";
+      body.style.width = "";
+      window.scrollTo(0, scrollY);
+    };
   }, [mobileOpen]);
 
   const navItems = customer
@@ -347,16 +362,21 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
                   </div>
                 </Link>
               ) : customer ? (
-                <button
-                  type="button"
-                  onClick={handleBecomeSeller}
-                  disabled={becomingSeller}
-                  className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 font-bold transition-colors disabled:opacity-60"
-                  data-testid="become-seller-btn-mobile"
-                >
-                  {becomingSeller ? <Loader2 className="w-4 h-4 animate-spin" /> : <Store className="w-4 h-4" />}
-                  Become a Seller
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleBecomeSeller}
+                    disabled={becomingSeller}
+                    className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 font-bold transition-colors disabled:opacity-60"
+                    data-testid="become-seller-btn-mobile"
+                  >
+                    {becomingSeller ? <Loader2 className="w-4 h-4 animate-spin" /> : <Store className="w-4 h-4" />}
+                    Become a Seller
+                  </button>
+                  {becomingSellerError && (
+                    <p className="text-xs text-destructive text-center px-2">{becomingSellerError}</p>
+                  )}
+                </>
               ) : null}
             </div>
           </div>

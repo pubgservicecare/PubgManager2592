@@ -82,17 +82,48 @@
 @layer base {
   * {
     @apply border-border;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    /* subtle grain texture */
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
     @apply font-bold tracking-wider uppercase;
+  }
+
+  /*
+   * MOBILE: Prevent iOS Safari from auto-zooming on input focus.
+   * iOS zooms when font-size < 16px. Setting font-size to 16px on
+   * all inputs stops the zoom while keeping the visual size via
+   * CSS transforms / container scaling.
+   */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /*
+   * MOBILE: Smooth momentum scrolling on iOS for all scrollable areas.
+   */
+  .overflow-y-auto,
+  .overflow-y-scroll,
+  .overflow-auto,
+  .overflow-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /*
+   * MOBILE: Remove callout on long-press for interactive elements.
+   */
+  a, button, [role="button"] {
+    -webkit-touch-callout: none;
   }
 }
 

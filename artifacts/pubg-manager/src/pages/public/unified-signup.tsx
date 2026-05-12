@@ -220,6 +220,7 @@ function CustomerSignupForm() {
                   placeholder="e.g. Ali Khan"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  autoComplete="name"
                   className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary"
                   data-testid="customer-signup-name"
                 />
@@ -232,6 +233,7 @@ function CustomerSignupForm() {
                   placeholder="e.g. 03001234567"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  autoComplete="tel"
                   className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary"
                   data-testid="customer-signup-phone"
                 />
@@ -244,6 +246,7 @@ function CustomerSignupForm() {
                   placeholder="At least 6 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
                   className="w-full bg-background border border-border rounded-xl pl-10 pr-12 py-3 text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary"
                   data-testid="customer-signup-password"
                 />
@@ -434,7 +437,7 @@ function SellerSignupForm({ prefillName, prefillPhone }: { prefillName: string; 
           <form onSubmit={handleSubmit} className="space-y-5">
             <h2 className="text-sm font-bold text-emerald-400 uppercase tracking-wider">Personal Info</h2>
 
-            <Field icon={User} label="Full Name" value={form.name} onChange={set("name")} required testId="seller-signup-name" />
+            <Field icon={User} label="Full Name" value={form.name} onChange={set("name")} required testId="seller-signup-name" autoComplete="name" />
             <div>
               <Field
                 icon={AtSign}
@@ -449,7 +452,7 @@ function SellerSignupForm({ prefillName, prefillPhone }: { prefillName: string; 
                 3-20 characters · letters, numbers, or underscore. This is the name buyers will see.
               </p>
             </div>
-            <Field icon={Mail} label="Email" type="email" value={form.email} onChange={set("email")} required testId="seller-signup-email" />
+            <Field icon={Mail} label="Email" type="email" value={form.email} onChange={set("email")} required testId="seller-signup-email" autoComplete="email" />
             <Field
               icon={Phone}
               label="Phone Number (from your customer account)"
@@ -459,12 +462,13 @@ function SellerSignupForm({ prefillName, prefillPhone }: { prefillName: string; 
               required
               readOnly
               testId="seller-signup-phone"
+              autoComplete="tel"
             />
-            <Field icon={MessageCircle} label="WhatsApp (optional)" value={form.whatsapp} onChange={set("whatsapp")} placeholder="03XX-XXXXXXX" />
+            <Field icon={MessageCircle} label="WhatsApp (optional)" value={form.whatsapp} onChange={set("whatsapp")} placeholder="03XX-XXXXXXX" autoComplete="tel" />
 
             <h2 className="text-sm font-bold text-emerald-400 uppercase tracking-wider pt-4">Password</h2>
-            <Field icon={Lock} label="Password (min 6 chars)" type="password" value={form.password} onChange={set("password")} required testId="seller-signup-password" />
-            <Field icon={Lock} label="Confirm Password" type="password" value={form.confirmPassword} onChange={set("confirmPassword")} required testId="seller-signup-confirm" />
+            <Field icon={Lock} label="Password (min 6 chars)" type="password" value={form.password} onChange={set("password")} required testId="seller-signup-password" autoComplete="new-password" />
+            <Field icon={Lock} label="Confirm Password" type="password" value={form.confirmPassword} onChange={set("confirmPassword")} required testId="seller-signup-confirm" autoComplete="new-password" />
 
             <h2 className="text-sm font-bold text-emerald-400 uppercase tracking-wider pt-4">Identity Verification</h2>
             <Field icon={IdCard} label="CNIC Number (13 digits)" value={form.cnicNumber} onChange={set("cnicNumber")} placeholder="12345-1234567-1" required testId="seller-signup-cnic" />
@@ -515,7 +519,7 @@ function FieldRow({ icon: Icon, label, children }: any) {
   );
 }
 
-function Field({ icon: Icon, label, type = "text", value, onChange, placeholder, required, readOnly, testId }: any) {
+function Field({ icon: Icon, label, type = "text", value, onChange, placeholder, required, readOnly, testId, autoComplete }: any) {
   return (
     <div className="space-y-1.5">
       <label className="text-xs font-bold text-muted-foreground uppercase block">{label}</label>
@@ -529,6 +533,7 @@ function Field({ icon: Icon, label, type = "text", value, onChange, placeholder,
           required={required}
           readOnly={readOnly}
           data-testid={testId}
+          autoComplete={autoComplete}
           className={`w-full bg-background border-2 border-border focus:border-emerald-500 rounded-xl pl-10 pr-4 py-3 text-white outline-none transition-colors text-sm ${readOnly ? "opacity-70 cursor-not-allowed focus:border-border" : ""}`}
         />
       </div>

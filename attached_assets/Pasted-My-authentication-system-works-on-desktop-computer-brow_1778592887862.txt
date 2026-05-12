@@ -1,0 +1,156 @@
+My authentication system works on desktop/computer browsers but fails on mobile devices. Users can sign up, but on mobile login either fails, session is not created, cookies are missing, requests are rejected, or the app behaves differently from desktop.
+
+Please do a COMPLETE mobile compatibility audit for BOTH frontend and backend and fix ALL mobile-related issues, not just login.
+
+Project Details:
+- Backend deployed on Render
+- Frontend and backend are separate domains
+- Authentication uses sessions/cookies
+- Mobile browsers affected:
+  - Android Chrome
+  - iPhone Safari
+  - Samsung Internet
+  - Other mobile browsers
+
+I want a FULL investigation and complete fixes.
+
+========================
+AUTH & LOGIN CHECKS
+========================
+
+1. Cookie Configuration
+- Ensure cookies work properly on Android + iPhone browsers.
+- Fix SameSite and Secure settings.
+- In production use:
+  secure: true
+  sameSite: "none"
+
+Example:
+app.use(cors({
+  origin: FRONTEND_URL,
+  credentials: true
+}))
+
+session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: true,
+    httpOnly: true,
+    sameSite: "none",
+    maxAge: 1000 * 60 * 60 * 24 * 7
+  }
+})
+
+2. Frontend Requests
+- Ensure ALL axios/fetch requests include credentials.
+
+Axios:
+axios.defaults.withCredentials = true
+
+OR:
+axios.post(url, data, {
+  withCredentials: true
+})
+
+Fetch:
+fetch(url, {
+  credentials: "include"
+})
+
+3. CORS Fix
+- Do NOT use origin: "*"
+- Use exact frontend domain.
+- Ensure Render backend allows frontend domain.
+
+4. HTTPS Issues
+- Mobile browsers block insecure cookies.
+- Ensure frontend and backend both use HTTPS URLs only.
+- Remove all localhost URLs from production.
+
+5. Password Verification
+- Verify bcrypt compare works correctly.
+- Check login controller logic carefully.
+- Ensure hashed passwords are stored correctly.
+
+6. Session Persistence
+- Ensure session store works in production.
+- Check express-session configuration.
+- Verify cookies are actually sent on mobile.
+
+7. Debugging
+- Add detailed logs for:
+  - login request
+  - password compare result
+  - session creation
+  - cookie sending
+  - auth middleware
+
+========================
+FULL MOBILE AUDIT
+========================
+
+Also inspect and fix ALL other mobile-specific issues across the project:
+
+1. API Issues
+- Any API failing only on mobile
+- Network request failures
+- CORS/preflight issues
+- Timeout issues
+- Render cold start issues
+
+2. Responsive UI Problems
+- Broken layouts on small screens
+- Overflow issues
+- Buttons not clickable
+- Hidden inputs/modals
+- Navbar/menu issues
+- Keyboard overlapping input fields
+
+3. Mobile Browser Compatibility
+- Safari issues
+- Android Chrome issues
+- Touch event issues
+- Viewport problems
+- Fixed position bugs
+- Input focus issues
+
+4. Performance
+- Slow mobile loading
+- Large bundle issues
+- Excessive API calls
+- Memory leaks
+- Re-render problems
+
+5. Authentication Edge Cases
+- Refresh causing logout
+- Session lost after reopening app
+- Infinite loading
+- Redirect loops
+- Auth middleware failures
+
+6. Storage Issues
+- localStorage/sessionStorage failures
+- Token persistence issues
+- Cookie expiration issues
+
+7. Production Environment
+- Incorrect environment variables
+- Wrong API URLs
+- Mixed HTTP/HTTPS requests
+- Render deployment problems
+
+========================
+FINAL REQUIREMENTS
+========================
+
+- Fully fix ALL mobile-related issues.
+- Provide final corrected backend and frontend code.
+- Explain exactly what problems were found.
+- Ensure full compatibility on:
+  - Android Chrome
+  - iPhone Safari
+  - Samsung Internet
+  - Mobile Firefox
+- Optimize the app for mobile performance and stability.
