@@ -48,6 +48,45 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Raise the warning threshold — chunks are now properly split
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        // Split vendor libraries into named, cacheable chunks
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+
+          // Charts (recharts + d3 deps) — only loaded on admin & seller dashboard
+          if (id.includes("recharts") || id.includes("/d3-") || id.includes("victory-vendor")) {
+            return "vendor-charts";
+          }
+
+          // Framer Motion — only loaded on home & seller dashboard
+          if (id.includes("framer-motion")) {
+            return "vendor-framer";
+          }
+
+          // Uppy file-upload stack — only loaded on account create/edit forms
+          if (id.includes("@uppy") || id.includes("/uppy/")) {
+            return "vendor-uppy";
+          }
+
+          // Radix UI component primitives
+          if (id.includes("@radix-ui")) {
+            return "vendor-radix";
+          }
+
+          // Lucide icons — tree-shaken per page, isolated for long-lived HTTP cache
+          if (id.includes("lucide-react") || id.includes("lucide")) {
+            return "vendor-lucide";
+          }
+
+          // TanStack Query + React — all in one vendor chunk to avoid circular
+          // cross-chunk imports that occur when react/react-dom are isolated
+          return "vendor";
+        },
+      },
+    },
   },
   server: {
     port,
