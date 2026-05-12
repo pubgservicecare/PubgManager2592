@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, sql } from "drizzle-orm";
 import { db, sellersTable } from "@workspace/db";
 import bcrypt from "bcryptjs";
-import { useSecureCookies } from "../app";
+import { useSecureCookies, cookieSameSite } from "../app";
 
 const router: IRouter = Router();
 
@@ -21,7 +21,7 @@ const clearSessionCookie = (res: any) => {
     path: "/",
     httpOnly: true,
     secure: useSecureCookies,
-    sameSite: useSecureCookies ? "none" : "lax",
+    sameSite: cookieSameSite,
   });
 };
 

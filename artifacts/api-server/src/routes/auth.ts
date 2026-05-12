@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, settingsTable } from "@workspace/db";
 import bcrypt from "bcryptjs";
-import { useSecureCookies } from "../app";
+import { useSecureCookies, cookieSameSite } from "../app";
 
 const router: IRouter = Router();
 
@@ -66,7 +66,7 @@ router.post("/auth/logout", (req, res): void => {
       path: "/",
       httpOnly: true,
       secure: useSecureCookies,
-      sameSite: useSecureCookies ? "none" : "lax",
+      sameSite: cookieSameSite,
     });
     res.json({ success: true });
   });

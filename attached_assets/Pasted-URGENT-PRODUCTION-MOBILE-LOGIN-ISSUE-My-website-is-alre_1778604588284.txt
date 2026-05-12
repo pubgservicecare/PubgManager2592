@@ -1,0 +1,254 @@
+URGENT PRODUCTION MOBILE LOGIN ISSUE
+
+My website is already FULLY DEPLOYED in production.
+
+==================================================
+DEPLOYMENT DETAILS
+==================================================
+
+Frontend:
+- Live production frontend deployed
+- HTTPS enabled
+- Responsive website
+
+Backend:
+- Backend deployed on Render
+- Production environment
+- HTTPS enabled
+- Separate backend domain
+
+Database:
+- Production database connected
+
+Authentication System:
+- Customer login/signup
+- Seller login/signup
+- Session/cookie based authentication
+
+==================================================
+CURRENT ISSUE
+==================================================
+
+Desktop/Laptop:
+✅ Customer login works
+✅ Seller login works
+
+Mobile Devices:
+❌ Customer login NOT working
+❌ Seller login NOT working
+❌ Session not created
+❌ Cookies may not persist
+❌ Auth may fail/reset
+❌ Login request may be rejected
+
+Affected Mobile Browsers:
+- Android Chrome
+- iPhone Safari
+- Samsung Internet
+- Mobile Firefox
+
+This is a LIVE PRODUCTION ISSUE and needs a COMPLETE permanent fix.
+
+==================================================
+FULL INVESTIGATION REQUIRED
+==================================================
+
+Please deeply inspect BOTH frontend and backend authentication systems and fix ALL mobile-related production issues.
+
+==================================================
+1. COOKIE CONFIGURATION
+==================================================
+
+Mobile browsers are stricter than desktop browsers.
+
+Inspect and FIX:
+- SameSite policy
+- Secure cookies
+- httpOnly
+- cookie domain
+- cookie path
+- proxy behavior
+- session persistence
+
+Ensure proper production configuration:
+
+app.set("trust proxy", 1);
+
+app.use(cors({
+  origin: FRONTEND_URL,
+  credentials: true
+}));
+
+session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  proxy: true,
+  cookie: {
+    secure: true,
+    httpOnly: true,
+    sameSite: "none",
+    maxAge: 1000 * 60 * 60 * 24 * 7
+  }
+});
+
+==================================================
+2. FRONTEND AUTH REQUESTS
+==================================================
+
+Ensure ALL frontend requests include credentials.
+
+Axios:
+axios.defaults.withCredentials = true;
+
+OR:
+axios.post(url, data, {
+  withCredentials: true
+});
+
+Fetch:
+fetch(url, {
+  credentials: "include"
+});
+
+Check ALL auth requests:
+- customer login
+- seller login
+- signup
+- auth check
+- session validation
+- logout
+- refresh auth
+
+==================================================
+3. CORS CONFIGURATION
+==================================================
+
+Inspect and fix:
+- origin must NOT be "*"
+- exact frontend production domain required
+- credentials must be enabled
+- OPTIONS requests handled correctly
+- mobile preflight requests working
+
+==================================================
+4. HTTPS / PRODUCTION URL ISSUES
+==================================================
+
+Mobile browsers reject insecure cookies.
+
+Ensure:
+- frontend uses HTTPS only
+- backend uses HTTPS only
+- no localhost URLs in production
+- no HTTP requests
+- no mixed HTTP/HTTPS content
+
+Check:
+- environment variables
+- API base URLs
+- production configs
+
+==================================================
+5. SESSION STORAGE
+==================================================
+
+Inspect:
+- express-session
+- session store
+- session persistence
+- session expiration
+- session regeneration
+- Render proxy behavior
+
+Ensure sessions persist properly on mobile devices.
+
+==================================================
+6. PASSWORD VERIFICATION
+==================================================
+
+Verify:
+- bcrypt compare logic
+- login controller
+- password hashing
+- customer auth
+- seller auth
+
+==================================================
+7. MOBILE-SPECIFIC ISSUES
+==================================================
+
+Inspect and fix:
+- Safari cookie restrictions
+- Android Chrome cookie policy
+- mobile cache problems
+- localStorage/sessionStorage issues
+- auth redirect loops
+- refresh logout problems
+- WebView compatibility
+
+==================================================
+8. RESPONSIVE / MOBILE UI ISSUES
+==================================================
+
+Check for:
+- hidden login elements
+- broken mobile forms
+- keyboard overlap issues
+- input focus problems
+- touch event issues
+- viewport problems
+- modal issues
+
+==================================================
+9. DEBUGGING LOGS
+==================================================
+
+Add logs for:
+- login request
+- customer/seller type
+- request headers
+- password compare result
+- session creation
+- cookie sending
+- auth middleware
+- CORS response
+- session existence
+
+==================================================
+10. RENDER DEPLOYMENT ISSUES
+==================================================
+
+Inspect:
+- Render proxy settings
+- trust proxy configuration
+- cold starts
+- backend restarts
+- timeout issues
+- memory leaks
+- production crashes
+
+==================================================
+11. FINAL REQUIREMENTS
+==================================================
+
+- FULLY FIX mobile login for BOTH:
+  - Customers
+  - Sellers
+
+- Ensure login works perfectly on:
+  - Android Chrome
+  - iPhone Safari
+  - Samsung Internet
+  - Mobile Firefox
+
+- Ensure sessions persist correctly.
+- Ensure refresh does NOT logout users.
+- Ensure production-ready stable authentication.
+
+Provide:
+- Final corrected frontend code
+- Final corrected backend code
+- Root cause explanation
+- Production-safe final implementation
+- Any additional fixes discovered during investigation

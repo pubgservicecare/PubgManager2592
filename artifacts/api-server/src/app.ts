@@ -37,6 +37,22 @@ const isProduction = process.env.NODE_ENV === "production";
 const isReplit = !!process.env.REPL_ID;
 export const useSecureCookies = isProduction || isReplit;
 
+// SameSite policy:
+//   "lax"  — correct for same-origin deployments (Render serves both frontend
+//             and API from the same URL, which is the production setup in
+//             render-build.sh). Also correct for Replit dev (Vite proxies /api
+//             internally, so the browser sees everything as same-origin).
+//   "none" — only required when the frontend is on a *completely separate*
+//             unrelated domain (e.g. a standalone Cloudflare Pages site hitting
+//             a different Render backend URL). In that case set the env var
+//             CROSS_ORIGIN_COOKIES=true on the backend.
+//
+// Mobile browsers (iOS Safari ITP, Android Chrome, Samsung Internet) treat
+// SameSite=None cookies as third-party / tracking cookies and block them.
+// Using "lax" avoids this entirely for the standard same-origin deployment.
+const isCrossOrigin = process.env.CROSS_ORIGIN_COOKIES === "true";
+export const cookieSameSite: "lax" | "none" = isCrossOrigin ? "none" : "lax";
+
 const corsOrigins: string[] = [];
 if (process.env.FRONTEND_URL) {
   corsOrigins.push(...process.env.FRONTEND_URL.split(",").map((o) => o.trim()));
@@ -81,6 +97,11 @@ app.use(
       pool,
       tableName: "user_sessions",
     }),
+    // proxy: true tells express-session to trust X-Forwarded-Proto from
+    // Render's (and Cloudflare's) reverse proxy when deciding whether the
+    // connection is secure. Required so the Secure cookie flag is set
+    // correctly behind multi-hop proxies.
+    proxy: true,
     secret: (() => {
       const s = process.env.SESSION_SECRET;
       if (!s) throw new Error("SESSION_SECRET environment variable is required but was not provided.");
@@ -92,7 +113,7 @@ app.use(
       secure: useSecureCookies,
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: useSecureCookies ? "none" : "lax",
+      sameSite: cookieSameSite,
     },
   })
 );
