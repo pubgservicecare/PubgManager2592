@@ -97,8 +97,11 @@ if (isProduction) {
   const frontendDist = path.resolve(__dirname, "../../pubg-manager/dist/public");
   app.use(express.static(frontendDist, { index: false }));
   // SPA fallback — all non-API routes serve index.html.
-  // Express 5 compatible: use "*" (not "/{*path}").
-  app.get("*", (_req, res) => {
+  // app.use() with no path is the correct Express 5 / path-to-regexp v8 catch-all.
+  // Neither "*" nor "/{*path}" are valid in path-to-regexp v8.
+  // This runs after express.static() and after all /api routes, so it only
+  // fires for unmatched frontend routes (e.g. /account/123, /admin, /my).
+  app.use((_req, res) => {
     res.sendFile(path.join(frontendDist, "index.html"));
   });
 }
