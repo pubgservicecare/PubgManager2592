@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { AdminLayout } from "@/components/AdminLayout";
 import { useGetDashboard } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
+import { apiUrl } from "@/lib/api-url";
 import { formatCurrency } from "@/lib/helpers";
 import {
   Gamepad2,
@@ -501,6 +502,9 @@ type HealthData = {
   message: string;
   uptime: number;
   timestamp: string;
+  memoryMB: number;
+  heapUsedMB: number;
+  heapTotalMB: number;
 };
 
 function ServerStatusWidget() {
@@ -508,7 +512,7 @@ function ServerStatusWidget() {
     useQuery<HealthData>({
       queryKey: ["server-health"],
       queryFn: async () => {
-        const res = await fetch("/health");
+        const res = await fetch(apiUrl("/health"));
         if (!res.ok) throw new Error("Server unhealthy");
         return res.json();
       },
@@ -603,7 +607,13 @@ function ServerStatusWidget() {
           </div>
           <div className="min-w-0">
             <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Memory</p>
-            <p className="text-[10px] text-muted-foreground mt-1">Via /api/healthz log</p>
+            {isLoading ? (
+              <div className="h-5 w-16 bg-secondary/60 rounded animate-pulse mt-1" />
+            ) : online && data?.memoryMB ? (
+              <p className="text-lg font-display font-black text-white">{data.memoryMB} MB</p>
+            ) : (
+              <p className="text-lg font-display font-black text-muted-foreground/50">—</p>
+            )}
           </div>
         </div>
 

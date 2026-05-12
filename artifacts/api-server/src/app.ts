@@ -80,11 +80,15 @@ app.use(express.urlencoded({ extended: true }));
 // so uptime pings (UptimeRobot, cron-job.org, Better Stack, etc.) never touch
 // the database or session store. Response is always < 1 ms.
 app.get("/health", (_req, res) => {
+  const mem = process.memoryUsage();
   res.status(200).json({
     success: true,
     message: "Server is alive",
     uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
+    memoryMB: Math.round(mem.rss / 1024 / 1024),
+    heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+    heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
   });
 });
 
