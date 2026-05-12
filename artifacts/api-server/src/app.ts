@@ -38,20 +38,19 @@ const isReplit = !!process.env.REPL_ID;
 export const useSecureCookies = isProduction || isReplit;
 
 // SameSite policy:
-//   "lax"  — correct for same-origin deployments (Render serves both frontend
-//             and API from the same URL, which is the production setup in
-//             render-build.sh). Also correct for Replit dev (Vite proxies /api
-//             internally, so the browser sees everything as same-origin).
-//   "none" — only required when the frontend is on a *completely separate*
-//             unrelated domain (e.g. a standalone Cloudflare Pages site hitting
-//             a different Render backend URL). In that case set the env var
-//             CROSS_ORIGIN_COOKIES=true on the backend.
+//   "none" — required when the frontend and backend are on different domains
+//             (e.g. frontend on Cloudflare Pages / Vercel, backend on Render).
+//             This is the common production setup and requires HTTPS + Secure.
+//   "lax"  — correct ONLY for same-origin deployments where Express serves
+//             the built frontend directly (render-build.sh single-service setup).
+//             Set SAME_ORIGIN_DEPLOYMENT=true to opt into this.
 //
-// Mobile browsers (iOS Safari ITP, Android Chrome, Samsung Internet) treat
-// SameSite=None cookies as third-party / tracking cookies and block them.
-// Using "lax" avoids this entirely for the standard same-origin deployment.
-const isCrossOrigin = process.env.CROSS_ORIGIN_COOKIES === "true";
-export const cookieSameSite: "lax" | "none" = isCrossOrigin ? "none" : "lax";
+// Default is "none" for HTTPS (useSecureCookies=true) so that the standard
+// cross-origin production deployment works out of the box.
+// In development (HTTP) it is always "lax" because "none" requires Secure.
+const isSameOrigin = process.env.SAME_ORIGIN_DEPLOYMENT === "true";
+export const cookieSameSite: "lax" | "none" =
+  useSecureCookies && !isSameOrigin ? "none" : "lax";
 
 const corsOrigins: string[] = [];
 if (process.env.FRONTEND_URL) {

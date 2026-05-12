@@ -1,0 +1,225 @@
+URGENT PRODUCTION ADMIN LOGIN ISSUE
+
+My website is already FULLY DEPLOYED in production.
+
+==================================================
+DEPLOYMENT DETAILS
+==================================================
+
+Frontend:
+- Live production frontend deployed
+- HTTPS enabled
+- Responsive website
+
+Backend:
+- Backend deployed on Render
+- Production environment
+- HTTPS enabled
+- Separate backend domain
+
+Database:
+- Production database connected
+
+Authentication System:
+- Customer login/signup
+- Seller login/signup
+- Admin login system
+- Session/cookie based authentication
+
+==================================================
+CURRENT ISSUE
+==================================================
+
+Customer Login:
+- May work partially
+
+Seller Login:
+- May work partially
+
+Admin Login:
+❌ Admin login is NOT working
+❌ Admin authentication failing
+❌ Session may not be created
+❌ Cookies may not persist
+❌ Admin route may reject access
+❌ Admin panel/dashboard inaccessible
+
+This is a LIVE PRODUCTION ISSUE.
+
+==================================================
+FULL ADMIN AUTH INVESTIGATION REQUIRED
+==================================================
+
+Please deeply inspect BOTH frontend and backend admin authentication flow and fix ALL issues permanently.
+
+==================================================
+1. ADMIN LOGIN FLOW
+==================================================
+
+Inspect:
+- admin login controller
+- admin authentication middleware
+- admin session creation
+- admin cookie handling
+- admin role verification
+- admin token/session validation
+
+Verify:
+- admin credentials are validated correctly
+- bcrypt compare works properly
+- admin user lookup works
+- admin role check works
+
+==================================================
+2. COOKIE & SESSION CONFIGURATION
+==================================================
+
+Inspect and fix:
+- SameSite
+- Secure cookies
+- httpOnly
+- trust proxy
+- session persistence
+
+Ensure proper production configuration:
+
+app.set("trust proxy", 1);
+
+app.use(cors({
+  origin: FRONTEND_URL,
+  credentials: true
+}));
+
+session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  proxy: true,
+  cookie: {
+    secure: true,
+    httpOnly: true,
+    sameSite: "none",
+    maxAge: 1000 * 60 * 60 * 24 * 7
+  }
+});
+
+==================================================
+3. FRONTEND AUTH REQUESTS
+==================================================
+
+Ensure ALL admin requests include credentials.
+
+Axios:
+axios.defaults.withCredentials = true;
+
+OR:
+axios.post(url, data, {
+  withCredentials: true
+});
+
+Fetch:
+fetch(url, {
+  credentials: "include"
+});
+
+Check:
+- admin login
+- admin auth check
+- admin dashboard requests
+- admin logout
+- session validation
+
+==================================================
+4. CORS CONFIGURATION
+==================================================
+
+Inspect:
+- origin must NOT be "*"
+- exact frontend production domain required
+- credentials enabled
+- OPTIONS requests handled correctly
+
+==================================================
+5. HTTPS / PRODUCTION ISSUES
+==================================================
+
+Ensure:
+- frontend uses HTTPS
+- backend uses HTTPS
+- no localhost URLs in production
+- no mixed HTTP/HTTPS requests
+
+==================================================
+6. ADMIN ROUTE PROTECTION
+==================================================
+
+Inspect:
+- admin middleware
+- role-based access control
+- protected routes
+- admin dashboard authorization
+
+Ensure:
+- valid admin sessions are accepted
+- admin routes work in production
+
+==================================================
+7. DATABASE CHECKS
+==================================================
+
+Verify:
+- admin user exists in database
+- admin role stored correctly
+- password hash valid
+- admin query working correctly
+
+==================================================
+8. MOBILE + DESKTOP TESTING
+==================================================
+
+Ensure admin login works on:
+- Desktop browsers
+- Android Chrome
+- iPhone Safari
+- Samsung Internet
+- Mobile Firefox
+
+==================================================
+9. DEBUGGING LOGS
+==================================================
+
+Add logs for:
+- admin login request
+- admin lookup result
+- password compare result
+- session creation
+- cookie sending
+- admin middleware result
+- authorization checks
+
+==================================================
+10. RENDER DEPLOYMENT CHECKS
+==================================================
+
+Inspect:
+- Render proxy behavior
+- trust proxy settings
+- cold starts
+- timeout issues
+- backend restarts
+- session persistence
+
+==================================================
+11. FINAL REQUIREMENTS
+==================================================
+
+- FULLY FIX admin login issue.
+- Ensure admin dashboard works correctly.
+- Ensure sessions persist correctly.
+- Ensure production-ready stable authentication.
+
+Provide:
+- Final corrected frontend code
+- Final corrected backend code
+- Exact root cause explanation
+- All production-safe fixes

@@ -23,8 +23,9 @@ export function AdminLogin() {
       onSuccess: () => {
         window.location.href = "/admin"; // full reload to refresh auth context cleanly
       },
-      onError: (error) => {
-        setErrorMsg((error as any).response?.data?.error || "Login failed");
+      onError: (error: any) => {
+        // ApiError stores the parsed response body in `.data`, not `.response.data`
+        setErrorMsg(error?.data?.error || error?.message || "Login failed");
       }
     }
   });
