@@ -498,13 +498,18 @@ function formatUptime(seconds: number): string {
 }
 
 type HealthData = {
-  success: boolean;
-  message: string;
+  status: "ok";
   uptime: number;
   timestamp: string;
-  memoryMB: number;
-  heapUsedMB: number;
-  heapTotalMB: number;
+  memory: {
+    rssMB: number;
+    heapUsedMB: number;
+    heapTotalMB: number;
+  };
+  deployment: {
+    sameOrigin: boolean;
+    env: string;
+  };
 };
 
 function ServerStatusWidget() {
@@ -512,15 +517,16 @@ function ServerStatusWidget() {
     useQuery<HealthData>({
       queryKey: ["server-health"],
       queryFn: async () => {
-        const res = await fetch(apiUrl("/health"));
+        const res = await fetch(apiUrl("/api/healthz"));
         if (!res.ok) throw new Error("Server unhealthy");
         return res.json();
       },
       refetchInterval: 30_000,
-      retry: 1,
+      retry: 2,
+      retryDelay: 3_000,
     });
 
-  const online = !isError && !!data?.success;
+  const online = !isError && data?.status === "ok";
   const lastChecked = dataUpdatedAt
     ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
@@ -609,8 +615,8 @@ function ServerStatusWidget() {
             <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Memory</p>
             {isLoading ? (
               <div className="h-5 w-16 bg-secondary/60 rounded animate-pulse mt-1" />
-            ) : online && data?.memoryMB ? (
-              <p className="text-lg font-display font-black text-white">{data.memoryMB} MB</p>
+            ) : online && data?.memory ? (
+              <p className="text-lg font-display font-black text-white">{data.memory.rssMB} MB</p>
             ) : (
               <p className="text-lg font-display font-black text-muted-foreground/50">—</p>
             )}

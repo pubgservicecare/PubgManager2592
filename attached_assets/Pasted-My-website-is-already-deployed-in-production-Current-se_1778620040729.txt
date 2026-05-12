@@ -1,0 +1,150 @@
+My website is already deployed in production.
+
+Current setup:
+- Frontend + Backend running from Render same-origin deployment
+- Backend URL:
+https://pubg-api-ovgh.onrender.com
+- Mobile login issue is now understood and same-origin deployment is being used permanently
+- Render free plan causes backend sleep after ~15 minutes
+
+I now want a COMPLETE FINAL production cleanup and verification.
+
+Please do ALL of the following carefully:
+
+==================================================
+1. VERIFY HEALTH ENDPOINT
+==================================================
+
+Ensure this endpoint exists and works correctly:
+
+/api/healthz
+
+Expected response:
+{
+  "status": "ok"
+}
+
+Also include:
+- uptime
+- memory usage
+- timestamp
+
+Example:
+{
+  "status": "ok",
+  "uptime": process.uptime(),
+  "memory": process.memoryUsage(),
+  "timestamp": Date.now()
+}
+
+==================================================
+2. FIX ADMIN DASHBOARD SERVER STATUS WIDGET
+==================================================
+
+Currently admin dashboard shows:
+- Status: DOWN
+- Memory: —
+- Uptime: —
+
+Fully fix this system.
+
+Ensure:
+- dashboard fetches correct endpoint
+- auto-refresh works
+- server status updates correctly
+- uptime displays correctly
+- memory usage displays correctly
+- Render wake-up handled correctly
+
+==================================================
+3. VERIFY SAME-ORIGIN DEPLOYMENT
+==================================================
+
+Ensure:
+- frontend served directly from Render
+- NO Cloudflare Pages dependency
+- NO cross-origin API requests
+- ALL API calls use relative paths:
+/api/...
+
+Search entire codebase for:
+- localhost
+- VITE_API_URL
+- old backend URLs
+- absolute API URLs
+
+==================================================
+4. VERIFY AUTHENTICATION SYSTEM
+==================================================
+
+Ensure Customers, Sellers, and Admins:
+- login correctly on mobile
+- login correctly on desktop
+- sessions persist correctly
+- cookies work correctly
+- refresh does not logout users
+
+Verify:
+- session config
+- trust proxy
+- SameSite
+- Secure cookies
+- withCredentials
+- auth middleware
+
+==================================================
+5. VERIFY RENDER PRODUCTION CONFIG
+==================================================
+
+Ensure:
+- SAME_ORIGIN_DEPLOYMENT=true
+- FRONTEND_URL removed
+- VITE_API_URL removed
+
+Verify:
+- Render deployment stable
+- no broken env variables
+- no proxy issues
+
+==================================================
+6. VERIFY AUTO-PING SUPPORT
+==================================================
+
+Ensure /api/healthz works perfectly with:
+- UptimeRobot
+- Better Stack
+- Cron-job.org
+
+The endpoint must:
+- stay lightweight
+- respond fast
+- never crash
+
+==================================================
+7. ADD DEBUG LOGS
+==================================================
+
+Add logs for:
+- health endpoint hits
+- login requests
+- session creation
+- auth middleware
+- monitoring requests
+
+==================================================
+8. FINAL REQUIREMENTS
+==================================================
+
+- Fully production-ready setup
+- Mobile login permanently fixed
+- Health monitoring working
+- Admin dashboard server status working
+- UptimeRobot compatible
+- No cross-origin auth problems
+- Stable Render deployment
+
+Provide:
+- Final corrected code
+- Final verification report
+- Any remaining issues found
+- Recommended next production improvements

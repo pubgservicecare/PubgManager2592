@@ -109,20 +109,42 @@ app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ─── Health (before session middleware — fast, no DB) ────────────────────────
+// ─── Health endpoints (before session middleware — no DB, max speed) ──────────
+//
+// /api/healthz  — canonical endpoint for UptimeRobot / Better Stack / cron-job.org
+// /health        — legacy alias kept for backward compatibility
+//
+// Both respond identically. Keep them fast: no DB, no session, no auth.
 
-app.get("/health", (_req, res) => {
+function healthResponse(req: express.Request, res: express.Response) {
   const mem = process.memoryUsage();
+  const isMonitor =
+    (req.headers["user-agent"] ?? "").toLowerCase().includes("uptimerobot") ||
+    (req.headers["user-agent"] ?? "").toLowerCase().includes("betterstack") ||
+    (req.headers["user-agent"] ?? "").toLowerCase().includes("cron-job");
+
+  if (isMonitor) {
+    req.log.info({ monitor: true }, "health-monitor ping");
+  }
+
   res.status(200).json({
-    success: true,
-    message: "Server is alive",
+    status: "ok",
     uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
-    memoryMB: Math.round(mem.rss / 1024 / 1024),
-    heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
-    heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
+    memory: {
+      rssMB: Math.round(mem.rss / 1024 / 1024),
+      heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+      heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
+    },
+    deployment: {
+      sameOrigin: isSameOrigin,
+      env: process.env.NODE_ENV ?? "development",
+    },
   });
-});
+}
+
+app.get("/api/healthz", healthResponse);
+app.get("/health", healthResponse);
 
 // ─── Session ──────────────────────────────────────────────────────────────────
 
