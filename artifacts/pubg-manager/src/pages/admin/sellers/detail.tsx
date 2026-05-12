@@ -8,6 +8,7 @@ const WhatsappIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 import { formatCurrency, formatDateTime } from "@/lib/helpers";
+import { apiUrl } from "@/lib/api-url";
 
 interface Seller {
   id: number;
@@ -70,8 +71,8 @@ export function AdminSellerDetail() {
     setLoading(true);
     try {
       const [sRes, dRes] = await Promise.all([
-        fetch(`/api/admin/sellers/${id}`, { credentials: "include" }),
-        fetch(`/api/admin/sellers/${id}/dashboard`, { credentials: "include" }),
+        fetch(apiUrl(`/api/admin/sellers/${id}`), { credentials: "include" }),
+        fetch(apiUrl(`/api/admin/sellers/${id}/dashboard`), { credentials: "include" }),
       ]);
       if (!sRes.ok) {
         setSeller(null);
@@ -93,7 +94,7 @@ export function AdminSellerDetail() {
     if (!id) return;
     setActioning(true);
     try {
-      await fetch(`/api/admin/sellers/${id}/${path}`, {
+      await fetch(apiUrl(`/api/admin/sellers/${id}/${path}`), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -121,7 +122,7 @@ export function AdminSellerDetail() {
   const remove = async () => {
     if (!id) return;
     if (!confirm("Permanently delete this seller? This cannot be undone.")) return;
-    await fetch(`/api/admin/sellers/${id}`, { method: "DELETE", credentials: "include" });
+    await fetch(apiUrl(`/api/admin/sellers/${id}`), { method: "DELETE", credentials: "include" });
     setLocation("/admin/sellers");
   };
 
@@ -365,7 +366,7 @@ function PersonalInfoModal({ seller, objectUrl, onClose }: any) {
           <InfoRow icon={Mail} label="Email" value={seller.email} href={`mailto:${seller.email}`} />
           <InfoRow icon={Phone} label="Phone" value={seller.phone} href={`tel:${seller.phone}`} />
           <InfoRow
-            icon={SiWhatsapp}
+            icon={WhatsappIcon}
             label="WhatsApp"
             value={seller.whatsapp || "—"}
             href={seller.whatsapp ? `https://wa.me/${(seller.whatsapp || "").replace(/\D/g, "")}` : undefined}
@@ -505,7 +506,7 @@ function SellerLiveChatPanel({ sellerId, sellerName, onClose }: { sellerId: numb
 
   const load = async () => {
     try {
-      const res = await fetch(`/api/chat/sessions/${sessionId}/messages`, { credentials: "include" });
+      const res = await fetch(apiUrl(`/api/chat/sessions/${sessionId}/messages`), { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setMessages(data);
@@ -529,7 +530,7 @@ function SellerLiveChatPanel({ sellerId, sellerName, onClose }: { sellerId: numb
     if (!msg) return;
     setSending(true);
     try {
-      const res = await fetch(`/api/chat/sessions/${sessionId}/messages`, {
+      const res = await fetch(apiUrl(`/api/chat/sessions/${sessionId}/messages`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -546,7 +547,7 @@ function SellerLiveChatPanel({ sellerId, sellerName, onClose }: { sellerId: numb
 
   const markRead = async () => {
     try {
-      await fetch(`/api/chat/sessions/${sessionId}/read`, { method: "POST", credentials: "include" });
+      await fetch(apiUrl(`/api/chat/sessions/${sessionId}/read`), { method: "POST", credentials: "include" });
     } catch {}
   };
 

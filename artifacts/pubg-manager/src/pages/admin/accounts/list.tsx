@@ -115,7 +115,7 @@ export function AdminAccountsList() {
   const toggleFeatured = async (id: number, isFeatured: boolean, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const res = await fetch(`/api/accounts/${id}/feature`, {
+    const res = await fetch(apiUrl(`/api/accounts/${id}/feature`), {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -128,7 +128,7 @@ export function AdminAccountsList() {
   };
 
   const downloadCsv = (kind: "accounts" | "customers" | "payments") => {
-    window.open(`/api/exports/${kind}.csv`, "_blank");
+    window.open(apiUrl(`/api/exports/${kind}.csv`), "_blank");
   };
 
   const setBulkPrice = async () => {

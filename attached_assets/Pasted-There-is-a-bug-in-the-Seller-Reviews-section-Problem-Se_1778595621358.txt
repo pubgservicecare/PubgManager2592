@@ -1,0 +1,83 @@
+There is a bug in the Seller Reviews section.
+
+Problem:
+- Sellers are visible correctly on the website.
+- But when clicking the "Review" button in the Seller section on desktop/web view, it says:
+  "No Seller" or seller data not found.
+- However, in mobile view the seller data and reviews appear correctly.
+
+This means there is likely a desktop-only rendering issue, state issue, routing issue, API issue, hydration issue, or responsive conditional rendering bug.
+
+Please fully debug and fix the issue.
+
+========================
+THINGS TO CHECK
+========================
+
+1. Seller ID Passing
+- Verify sellerId is passed correctly when clicking Review.
+- Check route params, query params, and component props.
+- Ensure desktop view passes the same seller data as mobile view.
+
+2. API Request
+- Check if desktop review page/API request sends:
+  - correct seller ID
+  - correct slug
+  - correct username
+- Compare mobile vs desktop requests carefully.
+
+3. Conditional Rendering Bug
+- Check for:
+  - hidden components
+  - desktop-only conditions
+  - viewport-based rendering
+  - responsive Tailwind classes
+  - duplicated components
+
+Example issues:
+- md:block hidden
+- lg:hidden
+- conditional rendering by screen width
+
+4. State Management
+- Check Zustand/Redux/Context/local state.
+- Ensure seller data exists before rendering reviews.
+- Fix race conditions and undefined state.
+
+5. Hydration Issues
+- If using Next.js/React SSR:
+  - check hydration mismatch
+  - check client/server rendering differences
+  - verify useEffect loading flow
+
+6. Seller Fetch Logic
+- Ensure seller details load before reviews render.
+- Add proper loading state.
+- Prevent null/undefined seller access.
+
+7. Responsive Layout
+- Compare desktop component tree vs mobile component tree.
+- Ensure same review component is used.
+- Remove duplicated inconsistent logic.
+
+8. Review Modal/Page
+- Check:
+  - modal props
+  - selectedSeller state
+  - dynamic routes
+  - navigation logic
+
+9. Debugging
+Add console logs for:
+- clicked seller
+- seller ID
+- review API response
+- selected seller state
+- desktop vs mobile render path
+
+10. Final Goal
+- Reviews should work on BOTH desktop and mobile.
+- Clicking Review should always open the correct seller reviews.
+- Remove "No Seller" issue completely.
+- Optimize and clean the seller review flow.
+- Provide final corrected code and explain root cause.

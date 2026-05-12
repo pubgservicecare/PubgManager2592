@@ -1,0 +1,156 @@
+My website is already fully deployed in production.
+
+Project Setup:
+- Frontend deployed live
+- Backend deployed on Render
+- Production environment
+- Desktop + Mobile responsive website
+- Authentication system with login/signup
+- Seller system with reviews
+- Frontend and backend are separate domains
+
+Current Problem:
+- Sellers are showing correctly on the website.
+- In MOBILE VIEW seller reviews work correctly.
+- But in DESKTOP/COMPUTER VIEW:
+  when clicking the "Review" button in Seller section,
+  it shows:
+  "No Seller"
+  or seller data becomes undefined/not found.
+
+This issue exists only on desktop view while mobile works fine.
+
+I want a COMPLETE investigation and permanent fix.
+
+==================================================
+FULL DEBUG & INVESTIGATION REQUIRED
+==================================================
+
+Please deeply inspect the FULL frontend + backend flow and fix ALL related issues.
+
+========================
+CHECK THESE THINGS
+========================
+
+1. Seller ID / Data Passing
+- Verify sellerId is correctly passed on desktop.
+- Compare mobile vs desktop behavior.
+- Check:
+  - props
+  - route params
+  - query params
+  - selectedSeller state
+  - navigation logic
+
+2. API Request Debugging
+- Ensure desktop sends correct seller ID.
+- Compare mobile API request vs desktop API request.
+- Verify backend receives proper seller identifier.
+- Ensure API response is valid.
+
+3. Responsive Rendering Issues
+- Inspect Tailwind responsive classes carefully:
+  - hidden
+  - md:block
+  - lg:block
+  - lg:hidden
+  - conditional desktop rendering
+- Check if desktop uses a different component than mobile.
+
+4. React State Problems
+- Check:
+  - Zustand/Redux/Context
+  - useState
+  - useEffect
+  - async loading
+  - stale state
+  - race conditions
+- Ensure seller data exists before rendering reviews.
+
+5. Hydration / SSR Issues
+If using React/Next.js:
+- inspect hydration mismatch
+- inspect client vs server rendering
+- ensure seller state loads correctly
+
+6. Review Modal / Page Logic
+- Check modal opening logic
+- Check selected seller assignment
+- Verify review component props
+- Ensure modal/page always receives seller object
+
+7. Backend Validation
+- Ensure backend review endpoint works correctly.
+- Ensure seller lookup logic works in production.
+- Check Mongo/Postgres queries.
+- Prevent undefined seller errors.
+
+8. Production Environment Issues
+- Check deployed environment variables
+- Check production API URLs
+- Remove localhost references
+- Ensure production URLs are used everywhere
+
+9. Mobile/Desktop Difference Analysis
+- Find EXACT reason why:
+  - mobile works
+  - desktop fails
+- Compare rendering paths and state flow.
+
+10. Debugging Logs
+Add logs for:
+- clicked seller
+- seller ID
+- selected seller state
+- API request payload
+- API response
+- review modal props
+- desktop rendering path
+- mobile rendering path
+
+==================================================
+ALSO CHECK FOR OTHER WEBSITE ISSUES
+==================================================
+
+While debugging, also inspect and fix ALL possible issues in the deployed production website:
+
+1. Authentication Issues
+- mobile login problems
+- session/cookie issues
+- refresh logout issues
+
+2. API Issues
+- failed requests
+- CORS problems
+- Render cold start issues
+- timeout issues
+
+3. Responsive UI Issues
+- broken layouts
+- overlapping elements
+- hidden buttons
+- navbar/mobile menu issues
+
+4. Performance Problems
+- unnecessary re-renders
+- slow loading
+- duplicate API calls
+- memory leaks
+
+5. Production Bugs
+- incorrect environment variables
+- wrong API routes
+- mixed HTTP/HTTPS problems
+
+==================================================
+FINAL REQUIREMENTS
+==================================================
+
+- Fully fix the seller review issue on desktop.
+- Ensure reviews work on BOTH desktop and mobile.
+- Remove ALL "No Seller" errors.
+- Optimize the seller review flow.
+- Fix any related frontend/backend issues found.
+- Provide final corrected code.
+- Explain the root cause clearly.
+- Ensure production-ready stable behavior.
