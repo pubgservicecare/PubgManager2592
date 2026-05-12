@@ -1,0 +1,77 @@
+Mobile login STILL fails even after multiple Render redeploys and testing on different mobile devices.
+
+This is NOT a temporary cache issue anymore.
+
+I need a REAL permanent fix.
+
+Current status:
+- Render redeploys successfully every time
+- Tested on multiple Android/iPhone devices
+- Desktop login works
+- Mobile login consistently fails
+
+This means there is still a fundamental authentication/session/cookie architecture issue.
+
+Please stop giving temporary fixes and do a COMPLETE architecture-level investigation.
+
+Check ALL of these:
+
+1. Verify frontend is truly same-origin
+- frontend MUST be served directly from Express/Render
+- NO external frontend domain
+- NO Cloudflare Pages/Vercel/Netlify frontend
+- ALL API calls must be relative:
+/api/...
+
+2. Search entire codebase for:
+- localhost
+- old backend URLs
+- VITE_API_URL
+- hardcoded API domains
+- axios baseURL
+- fetch absolute URLs
+
+3. Verify session architecture
+- express-session setup
+- session store
+- session persistence
+- cookie creation
+- cookie reading
+- session regeneration
+- auth middleware
+
+4. Verify cookies on REAL mobile devices
+- inspect actual Set-Cookie headers
+- inspect browser cookie storage
+- inspect SameSite behavior
+- inspect Secure flag
+
+5. Verify NO duplicate auth systems exist
+- no mixed JWT + sessions
+- no conflicting middleware
+- no duplicated auth logic
+
+6. Verify frontend auth state
+- Zustand/Redux/Context
+- hydration issues
+- redirect loops
+- instant logout bugs
+
+7. Add hard debugging
+Log:
+- request origin
+- cookie headers
+- session ID
+- auth middleware result
+- login success/failure
+- mobile request details
+
+8. If sessions continue failing on mobile:
+MIGRATE authentication to JWT token-based auth instead of cookies/sessions.
+
+Store JWT securely and remove dependency on cross-browser session cookies.
+
+9. Final Requirement
+Find the EXACT root cause.
+Permanently fix mobile authentication.
+Provide final production-ready implementation.

@@ -20,5 +20,10 @@ services:
         value: admin
       - key: ADMIN_PASSWORD
         sync: false
-      # DO NOT set FRONTEND_URL — same-origin mode needs no CORS origin
-      # DO NOT set VITE_API_URL — frontend must use relative /api paths
+      #
+      # ── IMPORTANT: Do NOT add these ────────────────────────────────────────
+      #
+      # FRONTEND_URL  → not needed in same-origin mode (no CORS required)
+      # VITE_API_URL  → MUST NOT be set — will break mobile login on iOS Safari
+      #                 and trigger a build failure in render-build.sh
+      #
