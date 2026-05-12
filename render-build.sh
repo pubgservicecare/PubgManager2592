@@ -15,8 +15,11 @@ pnpm install --no-frozen-lockfile
 # Build the API server
 pnpm --filter @workspace/api-server run build
 
-# Build the frontend (served by the API server in production)
-# No VITE_API_URL = relative /api paths = same-origin, no CORS issues
+# Build the frontend.
+# IMPORTANT: Do NOT set VITE_API_URL here.
+# Without it, the frontend uses relative /api paths — which are same-origin
+# and work on ALL browsers including iOS Safari. Setting VITE_API_URL to an
+# absolute URL creates a cross-origin setup that breaks mobile login on Safari.
 pnpm --filter @workspace/pubg-manager run build
 
 echo "Build complete!"
