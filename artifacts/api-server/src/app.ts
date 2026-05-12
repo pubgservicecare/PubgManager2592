@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import session from "express-session";
@@ -35,7 +35,7 @@ app.use(
 
 const isProduction = process.env.NODE_ENV === "production";
 const isReplit = !!process.env.REPL_ID;
-const useSecureCookies = isProduction || isReplit;
+export const useSecureCookies = isProduction || isReplit;
 
 const corsOrigins: string[] = [];
 if (process.env.FRONTEND_URL) {
@@ -53,11 +53,14 @@ if (isReplit && process.env.REPLIT_DEV_DOMAIN) {
 }
 const corsOrigin = corsOrigins.length > 0 ? corsOrigins : false;
 
-app.set("trust proxy", 1);
+// Trust all proxy hops — required for Cloudflare + Render (multi-hop).
+// This ensures req.protocol is "https" and cookies get Secure flag correctly.
+app.set("trust proxy", true);
 
 app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 const PgSession = connectPgSimple(session);
 
 app.use(
@@ -93,10 +96,20 @@ app.use("/api", router);
 if (isProduction) {
   const frontendDist = path.resolve(__dirname, "../../pubg-manager/dist/public");
   app.use(express.static(frontendDist, { index: false }));
-  // SPA fallback — all non-API routes serve index.html
-  app.get("/{*path}", (_req, res) => {
+  // SPA fallback — all non-API routes serve index.html.
+  // Express 5 compatible: use "*" (not "/{*path}").
+  app.get("*", (_req, res) => {
     res.sendFile(path.join(frontendDist, "index.html"));
   });
 }
+
+// Global error handler — must be last, after all routes.
+// Catches any error passed to next(err) or unhandled async rejections in routes.
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  const status: number = err.status || err.statusCode || 500;
+  logger.error({ err }, "Unhandled error");
+  if (res.headersSent) return;
+  res.status(status).json({ error: err.message || "Internal server error" });
+});
 
 export default app;

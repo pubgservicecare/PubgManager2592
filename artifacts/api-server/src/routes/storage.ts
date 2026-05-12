@@ -6,7 +6,6 @@ import {
   RequestUploadUrlResponse,
 } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError, GcsNotConfiguredError } from "../lib/objectStorage";
-import { ObjectPermission } from "../lib/objectAcl";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -102,12 +101,16 @@ router.post("/storage/test-connection", async (req: Request, res: Response) => {
 });
 
 /**
- * GET /storage/public-objects/*
+ * GET /storage/public-objects/<anything>
+ * Uses a regex route for Express 5 / path-to-regexp v8 compatibility.
  */
-router.get("/storage/public-objects/*filePath", async (req: Request, res: Response) => {
+router.get(/^\/storage\/public-objects\/(.+)$/, async (req: Request, res: Response) => {
   try {
-    const raw = req.params.filePath;
-    const filePath = Array.isArray(raw) ? raw.join("/") : raw;
+    const filePath = req.params[0] as string;
+    if (!filePath) {
+      res.status(400).json({ error: "File path required" });
+      return;
+    }
     const file = await objectStorageService.searchPublicObject(filePath);
     if (!file) {
       res.status(404).json({ error: "File not found" });
@@ -132,12 +135,16 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
 });
 
 /**
- * GET /storage/objects/*
+ * GET /storage/objects/<anything>
+ * Uses a regex route for Express 5 / path-to-regexp v8 compatibility.
  */
-router.get("/storage/objects/*path", async (req: Request, res: Response) => {
+router.get(/^\/storage\/objects\/(.+)$/, async (req: Request, res: Response) => {
   try {
-    const raw = req.params.path;
-    const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
+    const wildcardPath = req.params[0] as string;
+    if (!wildcardPath) {
+      res.status(400).json({ error: "Object path required" });
+      return;
+    }
     const objectPath = `/objects/${wildcardPath}`;
 
     // Local storage path
@@ -188,7 +195,7 @@ function express_raw_middleware(req: Request, res: Response, next: () => void) {
     (req as any).body = Buffer.concat(chunks);
     next();
   });
-  req.on("error", (err) => {
+  req.on("error", (_err) => {
     res.status(500).json({ error: "Failed to read request body" });
   });
 }

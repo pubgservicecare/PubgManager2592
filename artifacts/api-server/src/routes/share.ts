@@ -20,36 +20,38 @@ function absoluteUrl(req: any, path: string): string {
 }
 
 router.get("/share/account/:id", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    res.status(400).send("Invalid id");
-    return;
-  }
-  const [acc] = await db.select().from(accountsTable).where(eq(accountsTable.id, id));
-  const [settings] = await db.select().from(settingsTable);
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) {
+      res.status(400).json({ error: "Invalid account id" });
+      return;
+    }
 
-  const siteName = settings?.siteName || "PUBG Account Manager";
-  const accountUrl = absoluteUrl(req, `/account/${id}`);
+    const [acc] = await db.select().from(accountsTable).where(eq(accountsTable.id, id));
+    const [settings] = await db.select().from(settingsTable);
 
-  if (!acc) {
-    res.status(404).send(`<!DOCTYPE html><meta charset="utf-8"><title>Not Found</title>`);
-    return;
-  }
+    if (!acc) {
+      res.status(404).json({ error: "Account not found" });
+      return;
+    }
 
-  const title = `${acc.title} — ${siteName}`;
-  const price = acc.priceForSale ? `PKR ${parseFloat(acc.priceForSale as string).toLocaleString()}` : "";
-  const desc = acc.description
-    ? acc.description.slice(0, 200)
-    : `Premium PUBG Mobile account available now${price ? ` for ${price}` : ""}. Verified, secure, instant transfer.`;
+    const siteName = settings?.siteName || "PUBG Account Manager";
+    const accountUrl = absoluteUrl(req, `/account/${id}`);
 
-  let imageUrl: string | null = null;
-  if (acc.imageUrls && acc.imageUrls.length > 0) {
-    imageUrl = absoluteUrl(req, `/api/storage${acc.imageUrls[0]}`);
-  } else if (settings?.logoUrl) {
-    imageUrl = absoluteUrl(req, `/api/storage${settings.logoUrl}`);
-  }
+    const title = `${acc.title} — ${siteName}`;
+    const price = acc.priceForSale ? `PKR ${parseFloat(acc.priceForSale as string).toLocaleString()}` : "";
+    const desc = acc.description
+      ? acc.description.slice(0, 200)
+      : `Premium PUBG Mobile account available now${price ? ` for ${price}` : ""}. Verified, secure, instant transfer.`;
 
-  const html = `<!DOCTYPE html>
+    let imageUrl: string | null = null;
+    if (acc.imageUrls && acc.imageUrls.length > 0) {
+      imageUrl = absoluteUrl(req, `/api/storage${acc.imageUrls[0]}`);
+    } else if (settings?.logoUrl) {
+      imageUrl = absoluteUrl(req, `/api/storage${settings.logoUrl}`);
+    }
+
+    const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -75,9 +77,13 @@ ${imageUrl ? `<meta name="twitter:image" content="${escapeHtml(imageUrl)}">` : "
 </body>
 </html>`;
 
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Cache-Control", "public, max-age=300");
-  res.send(html);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.send(html);
+  } catch (err) {
+    req.log.error({ err }, "share/account failed");
+    res.status(500).json({ error: "Failed to load share page" });
+  }
 });
 
 export default router;

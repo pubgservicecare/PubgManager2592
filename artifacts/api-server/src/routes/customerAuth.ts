@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, sql } from "drizzle-orm";
 import { db, customerUsersTable, customersTable, sellersTable } from "@workspace/db";
 import bcrypt from "bcryptjs";
+import { useSecureCookies } from "../app";
 
 const router: IRouter = Router();
 
@@ -30,6 +31,16 @@ function regenerateSession(req: any): Promise<void> {
     req.session.regenerate((err: any) => (err ? reject(err) : resolve()));
   });
 }
+
+const clearSessionCookie = (res: any) => {
+  // Must exactly match the session cookie attributes or the browser won't clear it.
+  res.clearCookie("connect.sid", {
+    path: "/",
+    httpOnly: true,
+    secure: useSecureCookies,
+    sameSite: useSecureCookies ? "none" : "lax",
+  });
+};
 
 router.post("/customer/signup", async (req, res): Promise<void> => {
   try {
@@ -174,7 +185,7 @@ router.post("/customer/login", async (req, res): Promise<void> => {
 
 router.post("/customer/logout", (req, res): void => {
   req.session.destroy(() => {
-    res.clearCookie("connect.sid");
+    clearSessionCookie(res);
     res.json({ success: true });
   });
 });
