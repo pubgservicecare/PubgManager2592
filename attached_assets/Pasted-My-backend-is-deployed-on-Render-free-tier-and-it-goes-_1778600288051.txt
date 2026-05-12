@@ -1,0 +1,95 @@
+My backend is deployed on Render free tier and it goes to sleep after inactivity.
+
+I want a COMPLETE FREE auto-ping/keep-alive system so the Render backend never sleeps.
+
+IMPORTANT:
+DO NOT use GitHub Actions.
+DO NOT create:
+- .github/workflows/keep-alive.yml
+
+I want a simpler external auto-ping solution instead.
+
+==================================================
+PROJECT DETAILS
+==================================================
+
+- Backend deployed on Render
+- Production environment
+- Free Render plan
+- Frontend and backend are separate domains
+- Need fully automatic keep-alive system
+
+==================================================
+REQUIREMENTS
+==================================================
+
+1. Create Health Endpoint
+Add a lightweight health route:
+
+Example:
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Server is alive"
+  });
+});
+
+2. Auto Ping System
+Use FREE external services like:
+- UptimeRobot
+- Better Stack
+- Cron-job.org
+- FastCron
+
+3. Setup Instructions
+Provide COMPLETE setup instructions for:
+- creating monitor
+- adding backend URL
+- ping interval
+- HTTPS setup
+
+4. Ping Interval
+Configure ping every 14 minutes so Render never sleeps.
+
+Example URL:
+https://my-backend.onrender.com/health
+
+5. Production Safety
+- Lightweight requests only
+- No database-heavy operations
+- No unnecessary load
+- Safe for long-term usage
+
+6. Monitoring
+Add logs for:
+- health endpoint hit
+- uptime checks
+- request success/failure
+
+7. Environment Safety
+- Ensure HTTPS only
+- Remove localhost references
+- Ensure production-safe configuration
+
+==================================================
+ALSO CHECK FOR RELATED ISSUES
+==================================================
+
+While implementing this system, also inspect:
+- Render deployment configuration
+- Cold start problems
+- Timeout issues
+- Backend crash/restart issues
+- Memory leaks
+- Infinite loops
+- Rate limit risks
+
+==================================================
+FINAL REQUIREMENTS
+==================================================
+
+- Provide FULL final implementation.
+- Explain setup steps clearly.
+- Ensure completely FREE solution.
+- Ensure backend stays awake permanently.
+- Ensure production-ready stable behavior.

@@ -61,6 +61,18 @@ app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Keep-alive health endpoint — intentionally placed BEFORE session middleware
+// so uptime pings (UptimeRobot, cron-job.org, Better Stack, etc.) never touch
+// the database or session store. Response is always < 1 ms.
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Server is alive",
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 const PgSession = connectPgSimple(session);
 
 app.use(
