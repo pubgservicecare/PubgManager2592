@@ -10,8 +10,18 @@ function looksLikeEmail(s: string): boolean {
   return typeof s === "string" && s.includes("@");
 }
 
+/** Strip all non-digit characters for phone comparison (dashes, spaces, +). */
 function normalizePhone(s: string): string {
   return String(s || "").replace(/\D/g, "");
+}
+
+/**
+ * Canonical phone: trim outer whitespace then strip formatting characters
+ * so that "0300-123-4567", "0300 1234567", and "03001234567" all resolve
+ * to the same canonical form stored in and queried from the database.
+ */
+function canonicalPhone(s: string): string {
+  return normalizePhone(String(s || "").trim());
 }
 
 function generateReferralCode(name: string): string {
@@ -33,7 +43,6 @@ function regenerateSession(req: any): Promise<void> {
 }
 
 const clearSessionCookie = (res: any) => {
-  // Must exactly match the session cookie attributes or the browser won't clear it.
   res.clearCookie("connect.sid", {
     path: "/",
     httpOnly: true,
@@ -42,21 +51,34 @@ const clearSessionCookie = (res: any) => {
   });
 };
 
+// ─── Customer Signup ────────────────────────────────────────────────────────
+
 router.post("/customer/signup", async (req, res): Promise<void> => {
   try {
-    const { phone, password, name, referralCode } = req.body;
+    const { phone: rawPhone, password, name, referralCode } = req.body;
 
-    if (!phone || !password || !name) {
+    if (!rawPhone || !password || !name) {
       res.status(400).json({ error: "name, phone, and password are required" });
       return;
     }
 
-    if (password.length < 6) {
+    if (typeof password !== "string" || password.length < 6) {
       res.status(400).json({ error: "Password must be at least 6 characters" });
       return;
     }
 
-    const existing = await db.select().from(customerUsersTable).where(eq(customerUsersTable.phone, phone));
+    // Store a canonical phone number so all lookup paths match.
+    const phone = canonicalPhone(rawPhone);
+    if (!phone || phone.length < 6) {
+      res.status(400).json({ error: "Please enter a valid phone number" });
+      return;
+    }
+
+    const existing = await db
+      .select({ id: customerUsersTable.id })
+      .from(customerUsersTable)
+      .where(eq(customerUsersTable.phone, phone))
+      .limit(1);
     if (existing.length > 0) {
       res.status(409).json({ error: "An account with this number already exists" });
       return;
@@ -71,19 +93,21 @@ router.post("/customer/signup", async (req, res): Promise<void> => {
       if (referrer) referredByUserId = referrer.id;
     }
 
+    // Hash the password — bcrypt.hash is always async; never store plaintext.
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const [customer] = await db.insert(customersTable).values({
-      name,
-      contact: phone,
-    }).returning();
+    const [customer] = await db
+      .insert(customersTable)
+      .values({ name: String(name).trim(), contact: phone })
+      .returning();
 
     if (!customer) {
+      req.log.error("customer signup: failed to create customer record");
       res.status(500).json({ error: "Failed to create customer record" });
       return;
     }
 
-    // Generate a unique referral code (retry on rare collision)
+    // Generate a unique referral code (retry on rare collision).
     let myReferralCode = generateReferralCode(name);
     for (let i = 0; i < 5; i++) {
       const [collision] = await db
@@ -95,31 +119,39 @@ router.post("/customer/signup", async (req, res): Promise<void> => {
       myReferralCode = generateReferralCode(name);
     }
 
-    const [user] = await db.insert(customerUsersTable).values({
-      phone,
-      passwordHash,
-      name,
-      customerId: customer.id,
-      referralCode: myReferralCode,
-      referredByUserId,
-    }).returning();
+    const [user] = await db
+      .insert(customerUsersTable)
+      .values({
+        phone,
+        passwordHash,
+        name: String(name).trim(),
+        customerId: customer.id,
+        referralCode: myReferralCode,
+        referredByUserId,
+      })
+      .returning();
 
     if (!user) {
+      req.log.error("customer signup: failed to create user record");
       res.status(500).json({ error: "Failed to create user record" });
       return;
     }
 
-    // Notify the referrer (non-blocking, ignore errors)
+    req.log.info({ userId: user.id, phone }, "customer signup: success");
+
+    // Notify the referrer (non-blocking, ignore errors).
     if (referredByUserId) {
-      import("../lib/notify").then(({ createNotification }) =>
-        createNotification({
-          customerUserId: referredByUserId!,
-          type: "system",
-          title: "New referral signup!",
-          message: `${name} signed up using your referral code. Thanks for spreading the word!`,
-          link: "/my",
-        })
-      ).catch(() => {});
+      import("../lib/notify")
+        .then(({ createNotification }) =>
+          createNotification({
+            customerUserId: referredByUserId!,
+            type: "system",
+            title: "New referral signup!",
+            message: `${name} signed up using your referral code. Thanks for spreading the word!`,
+            link: "/my",
+          }),
+        )
+        .catch(() => {});
     }
 
     await regenerateSession(req);
@@ -137,28 +169,52 @@ router.post("/customer/signup", async (req, res): Promise<void> => {
       customerId: customer.id,
     });
   } catch (err) {
-    req.log.error({ err }, "customer signup failed");
+    req.log.error({ err }, "customer signup: unexpected error");
     res.status(500).json({ error: "Signup failed, please try again" });
   }
 });
 
+// ─── Customer Login (direct endpoint) ───────────────────────────────────────
+
 router.post("/customer/login", async (req, res): Promise<void> => {
   try {
-    const { phone, password } = req.body;
+    const { phone: rawPhone, password } = req.body;
 
-    if (!phone || !password) {
+    if (!rawPhone || !password) {
       res.status(400).json({ error: "phone and password are required" });
       return;
     }
 
-    const [user] = await db.select().from(customerUsersTable).where(eq(customerUsersTable.phone, phone));
+    // Normalise the phone the same way we stored it at signup.
+    const phone = canonicalPhone(rawPhone);
+
+    const [user] = await db
+      .select()
+      .from(customerUsersTable)
+      .where(eq(customerUsersTable.phone, phone));
+
     if (!user) {
+      req.log.info({ phone }, "customer login: user not found");
+      res.status(401).json({ error: "Invalid number or password" });
+      return;
+    }
+
+    // Guard against legacy plaintext values (should not exist in normal flow).
+    if (!user.passwordHash.startsWith("$2")) {
+      req.log.warn({ userId: user.id }, "customer login: detected non-bcrypt hash, auto-rehashing");
+      const rehashed = await bcrypt.hash(user.passwordHash, 10);
+      await db
+        .update(customerUsersTable)
+        .set({ passwordHash: rehashed })
+        .where(eq(customerUsersTable.id, user.id));
+      req.log.info({ userId: user.id }, "customer login: auto-rehash complete — user must reset password");
       res.status(401).json({ error: "Invalid number or password" });
       return;
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
+      req.log.info({ userId: user.id }, "customer login: password mismatch");
       res.status(401).json({ error: "Invalid number or password" });
       return;
     }
@@ -171,6 +227,8 @@ router.post("/customer/login", async (req, res): Promise<void> => {
     sess.customerDbId = user.customerId;
     await saveSession(req);
 
+    req.log.info({ userId: user.id }, "customer login: success");
+
     res.json({
       id: user.id,
       phone: user.phone,
@@ -178,10 +236,12 @@ router.post("/customer/login", async (req, res): Promise<void> => {
       customerId: user.customerId,
     });
   } catch (err) {
-    req.log.error({ err }, "customer login failed");
+    req.log.error({ err }, "customer login: unexpected error");
     res.status(500).json({ error: "Login failed, please try again" });
   }
 });
+
+// ─── Customer Logout ─────────────────────────────────────────────────────────
 
 router.post("/customer/logout", (req, res): void => {
   req.session.destroy(() => {
@@ -189,6 +249,8 @@ router.post("/customer/logout", (req, res): void => {
     res.json({ success: true });
   });
 });
+
+// ─── Customer /me ─────────────────────────────────────────────────────────────
 
 router.get("/customer/me", async (req, res): Promise<void> => {
   try {
@@ -209,10 +271,12 @@ router.get("/customer/me", async (req, res): Promise<void> => {
       referralCode: user?.referralCode ?? null,
     });
   } catch (err) {
-    req.log.error({ err }, "customer/me failed");
+    req.log.error({ err }, "customer/me: unexpected error");
     res.status(500).json({ error: "Failed to fetch user info" });
   }
 });
+
+// ─── Customer Referral ────────────────────────────────────────────────────────
 
 router.get("/customer/referral", async (req, res): Promise<void> => {
   try {
@@ -238,13 +302,16 @@ router.get("/customer/referral", async (req, res): Promise<void> => {
       referralCount: count ?? 0,
     });
   } catch (err) {
-    req.log.error({ err }, "customer/referral failed");
+    req.log.error({ err }, "customer/referral: unexpected error");
     res.status(500).json({ error: "Failed to fetch referral info" });
   }
 });
 
-// Unified login: accepts a single identifier (phone OR email) + password.
-// Tries to authenticate against customers (by phone) and sellers (by email or phone).
+// ─── Unified Login (/auth/login) ──────────────────────────────────────────────
+//
+// Accepts a single identifier (phone OR email) + password.
+// Tries customer (by normalised phone) then seller (by email or phone).
+
 router.post("/auth/login", async (req, res): Promise<void> => {
   try {
     const { identifier, password } = req.body || {};
@@ -277,7 +344,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
       await saveSession(req);
     };
 
-    // 1) If looks like email, try seller by email first.
+    // 1) Email → try seller by email.
     if (isEmail) {
       const [seller] = await db
         .select()
@@ -286,6 +353,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
       if (seller) {
         const ok = await bcrypt.compare(password, seller.passwordHash);
         if (!ok) {
+          req.log.info({ sellerId: seller.id }, "auth/login: seller email password mismatch");
           res.status(401).json({ error: "Invalid email or password" });
           return;
         }
@@ -302,25 +370,40 @@ router.post("/auth/login", async (req, res): Promise<void> => {
           return;
         }
         await setSellerSession(seller);
+        req.log.info({ sellerId: seller.id }, "auth/login: seller login success (email)");
         res.json({
           role: "seller",
           user: { id: seller.id, name: seller.name, email: seller.email, status: seller.status },
         });
         return;
       }
+      req.log.info({ identifier: trimmed }, "auth/login: seller not found by email");
       res.status(401).json({ error: "Invalid email or password" });
       return;
     }
 
-    // 2) Phone path: try customer by exact match first.
+    // 2) Phone → normalise and try customer first (digits-only match).
+    //    Using regexp_replace on the stored value is resilient to any format
+    //    the phone was stored in (e.g. "0300-123-4567" stored vs "03001234567" entered).
     const [customerUser] = await db
       .select()
       .from(customerUsersTable)
-      .where(eq(customerUsersTable.phone, trimmed));
+      .where(
+        sql`regexp_replace(${customerUsersTable.phone}, '[^0-9]', '', 'g') = ${phoneNorm}`,
+      );
+
     if (customerUser) {
+      // Guard against legacy plaintext (should not exist in normal operation).
+      if (!customerUser.passwordHash.startsWith("$2")) {
+        req.log.warn({ userId: customerUser.id }, "auth/login: detected non-bcrypt hash for customer");
+        res.status(401).json({ error: "Invalid number or password" });
+        return;
+      }
+
       const ok = await bcrypt.compare(password, customerUser.passwordHash);
       if (ok) {
         await setCustomerSession(customerUser);
+        req.log.info({ userId: customerUser.id }, "auth/login: customer login success");
         res.json({
           role: "customer",
           user: {
@@ -332,13 +415,18 @@ router.post("/auth/login", async (req, res): Promise<void> => {
         });
         return;
       }
+      req.log.info({ userId: customerUser.id }, "auth/login: customer password mismatch");
+      // Don't fall through to seller check — the identifier matched a customer.
+      res.status(401).json({ error: "Invalid number or password" });
+      return;
     }
 
-    // 3) Fallback: try seller by phone (digits-only match).
+    // 3) No customer found → try seller by phone (digits-only match).
     const sellersByPhone = await db
       .select()
       .from(sellersTable)
       .where(sql`regexp_replace(${sellersTable.phone}, '[^0-9]', '', 'g') = ${phoneNorm}`);
+
     for (const seller of sellersByPhone) {
       const ok = await bcrypt.compare(password, seller.passwordHash);
       if (!ok) continue;
@@ -355,6 +443,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
         return;
       }
       await setSellerSession(seller);
+      req.log.info({ sellerId: seller.id }, "auth/login: seller login success (phone)");
       res.json({
         role: "seller",
         user: { id: seller.id, name: seller.name, email: seller.email, status: seller.status },
@@ -362,12 +451,15 @@ router.post("/auth/login", async (req, res): Promise<void> => {
       return;
     }
 
+    req.log.info({ identifier: trimmed }, "auth/login: no matching account found");
     res.status(401).json({ error: "Invalid credentials" });
   } catch (err) {
-    req.log.error({ err }, "auth/login failed");
+    req.log.error({ err }, "auth/login: unexpected error");
     res.status(500).json({ error: "Login failed, please try again" });
   }
 });
+
+// ─── Customer Seller-Status ───────────────────────────────────────────────────
 
 router.get("/customer/seller-status", async (req, res): Promise<void> => {
   try {
@@ -395,10 +487,12 @@ router.get("/customer/seller-status", async (req, res): Promise<void> => {
       email: chosen.email,
     });
   } catch (err) {
-    req.log.error({ err }, "customer/seller-status failed");
+    req.log.error({ err }, "customer/seller-status: unexpected error");
     res.status(500).json({ error: "Failed to fetch seller status" });
   }
 });
+
+// ─── Customer Become-Seller ───────────────────────────────────────────────────
 
 router.post("/customer/become-seller", async (req, res): Promise<void> => {
   try {
@@ -426,12 +520,12 @@ router.post("/customer/become-seller", async (req, res): Promise<void> => {
           chosen.status === "pending"
             ? "Your seller application is still under review by admin"
             : chosen.status === "rejected"
-            ? `Your seller application was rejected${chosen.rejectionReason ? `: ${chosen.rejectionReason}` : ""}`
-            : "Your seller account is currently unavailable",
+              ? `Your seller application was rejected${chosen.rejectionReason ? `: ${chosen.rejectionReason}` : ""}`
+              : "Your seller account is currently unavailable",
       });
       return;
     }
-    // Attach seller session
+    // Attach seller session.
     sess.sellerId = approved.id;
     sess.sellerName = approved.name;
     sess.sellerEmail = approved.email;
@@ -443,7 +537,7 @@ router.post("/customer/become-seller", async (req, res): Promise<void> => {
       seller: { id: approved.id, name: approved.name, email: approved.email },
     });
   } catch (err) {
-    req.log.error({ err }, "customer/become-seller failed");
+    req.log.error({ err }, "customer/become-seller: unexpected error");
     res.status(500).json({ error: "Failed to process request" });
   }
 });

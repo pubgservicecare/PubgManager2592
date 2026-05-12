@@ -101,6 +101,14 @@ export default defineConfig({
         target: apiTarget,
         changeOrigin: true,
         secure: false,
+        // Tell the API server the original request was HTTPS so it sends
+        // Secure session cookies back through the Vite dev proxy.
+        // Without this, Express sees req.secure=false (HTTP internally) and
+        // silently drops Set-Cookie — the session is saved to DB but the
+        // cookie never reaches the browser.
+        headers: {
+          "x-forwarded-proto": "https",
+        },
       },
     },
   },
