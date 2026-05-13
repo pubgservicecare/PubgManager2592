@@ -1,8 +1,16 @@
 User-agent: *
 Allow: /
+Allow: /account/
+Allow: /faq
+Allow: /signup
+Allow: /login
+
 Disallow: /admin
 Disallow: /admin/
 Disallow: /my
+Disallow: /my/
+Disallow: /seller/
 Disallow: /api/
+Disallow: /chat/
 
-Sitemap: /sitemap.xml
+Sitemap: https://www.codexstocks.org/sitemap.xml

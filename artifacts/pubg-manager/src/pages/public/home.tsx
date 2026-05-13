@@ -186,7 +186,7 @@ export function PublicHome() {
                 </div>
                 {popularTags.length > 0 && (
                   <div
-                    className={`${searchFocused ? "flex" : "hidden"} sm:flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:m-0 sm:p-0 sm:overflow-visible sm:flex-wrap`}
+                    className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:m-0 sm:p-0 sm:overflow-visible sm:flex-wrap"
                   >
                     <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider shrink-0">Popular:</span>
                     {popularTags.map((tag: string) => {

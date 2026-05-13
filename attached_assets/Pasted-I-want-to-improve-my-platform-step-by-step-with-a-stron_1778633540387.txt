@@ -1,0 +1,149 @@
+I want to improve my platform step-by-step with a strong long-term foundation.
+
+Project Vision:
+This is not just a random project. I built this platform because existing PUBG marketplaces felt:
+- slow
+- confusing
+- overloaded
+- difficult for beginners
+- poor mobile experience
+- hard to trust
+
+My goal is:
+- clean UI
+- beginner-friendly experience
+- fast mobile experience
+- easy navigation
+- trustworthy marketplace
+- long-term scalable platform
+
+Current Status:
+- Production deployed on Render
+- Same-origin deployment
+- Custom domain active:
+https://www.codexstocks.org
+- HTTPS working
+- Google indexing started
+- Mobile login mostly fixed
+- UptimeRobot setup in progress
+
+Now I want a COMPLETE product-quality + SEO + mobile experience audit.
+
+==================================================
+1. MOBILE EXPERIENCE AUDIT
+==================================================
+
+Deeply inspect the entire mobile experience.
+
+Focus on:
+- loading speed
+- responsiveness
+- touch usability
+- scrolling smoothness
+- mobile navigation
+- button sizes
+- spacing
+- readability
+- seller pages
+- review system
+- forms
+- keyboard overlap issues
+- image optimization
+
+Goal:
+Simple, fast, beginner-friendly mobile UX.
+
+==================================================
+2. UI/UX CLEANUP
+==================================================
+
+Inspect the whole platform for:
+- confusing layouts
+- unnecessary UI clutter
+- inconsistent spacing
+- bad alignment
+- poor readability
+- difficult navigation
+- too many clicks
+- unclear user flow
+
+Goal:
+Clean marketplace feel similar to modern apps.
+
+==================================================
+3. PERFORMANCE OPTIMIZATION
+==================================================
+
+Improve:
+- page load speed
+- image loading
+- unnecessary re-renders
+- bundle size
+- lazy loading
+- caching
+- API efficiency
+
+Goal:
+Fast experience even on weak mobile devices.
+
+==================================================
+4. SEO FOUNDATION
+==================================================
+
+Implement proper SEO setup:
+- sitemap.xml
+- robots.txt
+- page titles
+- meta descriptions
+- OpenGraph tags
+- structured metadata
+- canonical URLs
+
+Ensure:
+- Google-friendly indexing
+- mobile SEO optimization
+- clean URLs
+
+==================================================
+5. TRUST & MARKETPLACE QUALITY
+==================================================
+
+Suggest improvements for:
+- seller trust
+- review visibility
+- scam prevention
+- beginner confidence
+- marketplace transparency
+
+Do NOT overcomplicate the UI.
+
+==================================================
+6. ADMIN & MONITORING
+==================================================
+
+Fix and improve:
+- server status widget
+- uptime monitoring
+- health endpoint
+- admin monitoring stability
+
+==================================================
+7. FINAL REQUIREMENTS
+==================================================
+
+I do NOT want unnecessary complexity.
+
+I want:
+- simple
+- clean
+- scalable
+- beginner-friendly
+- mobile-first
+- production-ready architecture
+
+Please provide:
+- full audit
+- prioritized improvements
+- important issues found
+- recommended fixes
+- best long-term structure
