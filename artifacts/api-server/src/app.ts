@@ -270,50 +270,73 @@ app.get("/sitemap.xml", async (req, res) => {
       process.env.SITE_URL?.replace(/\/$/, "") ||
       `${req.protocol}://${req.headers.host}`;
 
+    // Fetch all active accounts for individual product pages
     const activeAccounts = await db
       .select({ id: accountsTable.id, updatedAt: accountsTable.updatedAt })
       .from(accountsTable)
       .where(eq(accountsTable.status, "active"));
 
-    const staticUrls = [
-      { loc: `${origin}/`, changefreq: "daily", priority: "1.0" },
-      { loc: `${origin}/faq`, changefreq: "weekly", priority: "0.7" },
-      { loc: `${origin}/login`, changefreq: "monthly", priority: "0.4" },
-      { loc: `${origin}/signup`, changefreq: "monthly", priority: "0.4" },
+    // ── Static public pages ──────────────────────────────────────────────────
+    // Only pages that are:
+    //   • Publicly accessible without login
+    //   • Have real SEO value (exclude /login, /chat sessions, seller portal, admin)
+    const staticUrls: Array<{ loc: string; changefreq: string; priority: string; lastmod?: string }> = [
+      // Homepage — highest priority, changes daily as inventory updates
+      { loc: `${origin}/`,      changefreq: "daily",   priority: "1.0" },
+      // FAQ — helpful long-tail content, updated occasionally
+      { loc: `${origin}/faq`,   changefreq: "weekly",  priority: "0.7" },
+      // Signup — brings new customers, indexed for brand searches
+      { loc: `${origin}/signup`, changefreq: "monthly", priority: "0.5" },
     ];
 
+    // ── Dynamic account pages (product pages — highest SEO value) ───────────
+    // Each active account listing is a unique product page Google should index.
+    // Priority 0.9 — second only to the homepage.
     const accountUrls = activeAccounts.map((a) => ({
       loc: `${origin}/account/${a.id}`,
       lastmod: a.updatedAt
         ? new Date(a.updatedAt).toISOString().split("T")[0]
-        : undefined,
+        : new Date().toISOString().split("T")[0],
       changefreq: "weekly",
-      priority: "0.8",
+      priority: "0.9",
     }));
 
-    const allUrls = [...staticUrls, ...accountUrls];
+    // Accounts first (most valuable for SEO), then static pages
+    const allUrls = [...accountUrls, ...staticUrls];
 
-    const xml =
-      `<?xml version="1.0" encoding="UTF-8"?>\n` +
-      `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-      allUrls
-        .map(
-          (u) =>
-            `  <url>\n    <loc>${u.loc}</loc>` +
-            (u.lastmod ? `\n    <lastmod>${u.lastmod}</lastmod>` : "") +
-            `\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority}</priority>\n  </url>`,
-        )
-        .join("\n") +
-      `\n</urlset>`;
+    const urlEntries = allUrls
+      .map((u) =>
+        [
+          "  <url>",
+          `    <loc>${u.loc}</loc>`,
+          u.lastmod ? `    <lastmod>${u.lastmod}</lastmod>` : null,
+          `    <changefreq>${u.changefreq}</changefreq>`,
+          `    <priority>${u.priority}</priority>`,
+          "  </url>",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      )
+      .join("\n");
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+    http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+${urlEntries}
+</urlset>`;
 
     res.setHeader("Content-Type", "application/xml; charset=utf-8");
-    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+    res.setHeader("X-Robots-Tag", "noindex"); // Don't index the sitemap itself
     res.send(xml);
   } catch (err) {
     req.log.error({ err }, "sitemap generation failed");
     res
       .status(500)
-      .send(`<?xml version="1.0"?><error>Sitemap unavailable</error>`);
+      .send(`<?xml version="1.0"?><error>Sitemap temporarily unavailable</error>`);
   }
 });
 
