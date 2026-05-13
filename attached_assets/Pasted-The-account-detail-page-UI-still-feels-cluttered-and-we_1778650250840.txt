@@ -1,0 +1,120 @@
+The account detail page UI still feels cluttered and weak on mobile. I want a complete redesign of the account detail experience focused on simplicity, trust, and fast communication.
+
+Goals:
+
+* clean mobile-first layout
+* beginner-friendly experience
+* easier contact flow
+* less visual clutter
+* better readability
+* modern marketplace feel
+
+Please redesign the entire account detail page carefully.
+
+==================================================
+
+1. MOBILE-FIRST ACCOUNT DETAIL REDESIGN
+   ==================================================
+
+The current UI around:
+
+* account details
+* video section
+* contact/chat area
+
+feels confusing and visually weak.
+
+Redesign it completely for mobile users first.
+
+Focus on:
+
+* spacing
+* readability
+* touch-friendly layout
+* clean typography
+* proper visual hierarchy
+* simple navigation
+
+==================================================
+2. CONTACT SECTION REDESIGN
+===========================
+
+Remove the current confusing chat/contact area design.
+
+Replace it with a clean communication section containing ONLY:
+
+1. Contact via WhatsApp
+2. Live Chat
+
+Both should:
+
+* look modern
+* large touch-friendly buttons
+* mobile optimized
+* visually clean
+* easy to understand for beginners
+
+==================================================
+3. AUTO ACCOUNT CONTEXT IN CHAT
+===============================
+
+When user clicks:
+
+* WhatsApp
+  OR
+* Live Chat
+
+the selected account information should automatically be included.
+
+Example:
+
+* account title
+* account ID
+* price
+* account link
+
+This should automatically appear in the chat message/context so buyers do not need to explain manually.
+
+==================================================
+4. VIDEO & MEDIA EXPERIENCE
+===========================
+
+Improve:
+
+* gallery layout
+* video responsiveness
+* mobile viewing
+* image navigation
+* spacing around media
+
+Goal:
+Premium clean marketplace feel.
+
+==================================================
+5. TRUST & BUYER EXPERIENCE
+===========================
+
+Add subtle trust-focused improvements:
+
+* seller info clarity
+* safer marketplace feel
+* cleaner review visibility
+* beginner guidance
+
+But DO NOT overcomplicate the UI.
+
+==================================================
+6. FINAL REQUIREMENTS
+=====================
+
+I want:
+
+* modern mobile-first UI
+* clean marketplace experience
+* simple communication flow
+* beginner-friendly design
+* less clutter
+* better conversions
+* trust-focused layout
+
+Do a full production-quality redesign, not small tweaks.
