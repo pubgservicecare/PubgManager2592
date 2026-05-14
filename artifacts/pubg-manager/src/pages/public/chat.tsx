@@ -158,7 +158,7 @@ export function PublicChat() {
                 value={guestName}
                 onChange={(e) => setGuestName(e.target.value)}
                 placeholder="Your Name"
-                className="w-full bg-[#0B0F19] border border-[#1E293B] focus:border-primary rounded-xl px-4 py-3 text-white outline-none transition-colors text-sm"
+                className="w-full bg-[#0B0F19] border border-[#1E293B] focus:border-primary rounded-xl px-4 py-3 text-white outline-none transition-colors text-base"
                 required
               />
               <button
@@ -258,7 +258,7 @@ export function PublicChat() {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Type your message…"
-            className="flex-1 bg-[#0B0F19] border border-[#1E293B] focus:border-primary rounded-xl px-4 py-3 text-white outline-none transition-colors text-sm min-w-0"
+            className="flex-1 bg-[#0B0F19] border border-[#1E293B] focus:border-primary rounded-xl px-4 py-3 text-white outline-none transition-colors text-base min-w-0"
             disabled={sendMutation.isPending}
           />
           <button
