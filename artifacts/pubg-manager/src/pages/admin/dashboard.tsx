@@ -25,6 +25,8 @@ import {
   RefreshCw,
   Wifi,
   WifiOff,
+  Users,
+  Store,
 } from "lucide-react";
 import { formatDate } from "@/lib/helpers";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
@@ -154,11 +156,45 @@ export function AdminDashboard() {
       </div>
 
       {/* Secondary metric tiles */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
         <MetricTile icon={Gamepad2} label="Total Accounts" value={stats.totalAccounts} color="primary" />
         <MetricTile icon={CheckCircle2} label="Active" value={stats.activeAccounts} color="emerald" />
         <MetricTile icon={Layers} label="Sold" value={stats.soldAccounts} color="blue" />
         <MetricTile icon={Clock} label="Installment" value={stats.installmentAccounts} color="amber" />
+      </div>
+
+      {/* Customer & Seller quick-access tiles */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+        <Link href="/admin/customers">
+          <div className="bg-card border border-border hover:border-primary/40 rounded-2xl p-4 flex items-center gap-4 cursor-pointer transition group">
+            <div className="w-11 h-11 rounded-xl bg-violet-500/15 text-violet-300 flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] uppercase font-bold text-muted-foreground tracking-widest">Customers</p>
+              <p className="text-2xl font-display font-black text-white">{(stats as any).totalCustomers ?? 0}</p>
+              <p className="text-[11px] text-violet-400 font-semibold">Total registered buyers</p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition shrink-0" />
+          </div>
+        </Link>
+        <Link href="/admin/sellers">
+          <div className="bg-card border border-border hover:border-primary/40 rounded-2xl p-4 flex items-center gap-4 cursor-pointer transition group">
+            <div className="w-11 h-11 rounded-xl bg-orange-500/15 text-orange-300 flex items-center justify-center shrink-0">
+              <Store className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] uppercase font-bold text-muted-foreground tracking-widest">Sellers</p>
+              <p className="text-2xl font-display font-black text-white">{(stats as any).totalSellers ?? 0}</p>
+              <p className="text-[11px] text-orange-400 font-semibold">
+                {(stats as any).pendingSellers > 0
+                  ? `${(stats as any).pendingSellers} pending review`
+                  : "All sellers managed here"}
+              </p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition shrink-0" />
+          </div>
+        </Link>
       </div>
 
       {/* Server Status Widget */}

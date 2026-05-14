@@ -599,9 +599,15 @@ router.get("/dashboard", requireAdmin, async (_req, res): Promise<void> => {
     .sort((a, b) => a.due.getTime() - b.due.getTime())
     .map(formatAlert);
 
-  const { chatSessionsTable } = await import("@workspace/db");
+  const { chatSessionsTable, customersTable, sellersTable } = await import("@workspace/db");
   const sessions = await db.select().from(chatSessionsTable);
   const unreadChatsCount = sessions.reduce((s, sess) => s + sess.unreadCount, 0);
+
+  const allCustomers = await db.select({ id: customersTable.id }).from(customersTable);
+  const allSellers = await db.select({ id: sellersTable.id, status: sellersTable.status }).from(sellersTable);
+  const totalCustomers = allCustomers.length;
+  const totalSellers = allSellers.length;
+  const pendingSellers = allSellers.filter((s) => s.status === "pending").length;
 
   res.json({
     totalInvestment,
@@ -614,6 +620,9 @@ router.get("/dashboard", requireAdmin, async (_req, res): Promise<void> => {
     pendingLinksCount,
     pendingPaymentsCount,
     unreadChatsCount,
+    totalCustomers,
+    totalSellers,
+    pendingSellers,
     dueAlerts: {
       overdueCount: overdue.length,
       dueSoonCount: dueSoon.length,
