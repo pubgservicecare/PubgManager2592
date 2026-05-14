@@ -5,10 +5,10 @@ import { z } from "zod/v4";
 export const settingsTable = pgTable("settings", {
   id: serial("id").primaryKey(),
   // Branding
-  siteName: text("site_name").notNull().default("PUBG Account Manager"),
-  siteDescription: text("site_description").notNull().default("Premium PUBG Mobile accounts marketplace"),
-  heroTagline: text("hero_tagline").notNull().default("DOMINATE THE BATTLEGROUND"),
-  footerText: text("footer_text").notNull().default("© PUBG Account Manager — All rights reserved."),
+  siteName: text("site_name").notNull().default("CodexStocks"),
+  siteDescription: text("site_description").notNull().default("Browse verified PUBG Mobile accounts with mythic skins, X-Suits, Glacier weapons and rare items — secure transfers, transparent listings, and a buying experience built for trust."),
+  heroTagline: text("hero_tagline").notNull().default("PUBG Mobile Account Marketplace"),
+  footerText: text("footer_text").notNull().default("© CodexStocks — All rights reserved."),
   logoUrl: text("logo_url"),
   // Contact
   supportEmail: text("support_email").notNull().default("support@example.com"),

@@ -77,10 +77,10 @@ export function PublicHome() {
               {/* ── SEO Hero Heading ─────────────────────────────────── */}
               <header className="mb-5">
                 <h1 className="text-xl sm:text-2xl font-display font-black text-white tracking-tight leading-tight">
-                  PUBG Mobile Account Marketplace
+                  {(settings as any)?.heroTagline || "PUBG Mobile Account Marketplace"}
                 </h1>
                 <p className="text-slate-400 mt-1 text-sm sm:text-[15px] leading-relaxed max-w-2xl">
-                  Browse verified PUBG Mobile accounts with mythic skins, X-Suits, Glacier weapons and rare items — secure transfers, transparent listings, and a buying experience built for trust.
+                  {(settings as any)?.siteDescription || "Browse verified PUBG Mobile accounts with secure transfers and transparent listings."}
                 </p>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2.5">
                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
