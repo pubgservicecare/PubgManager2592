@@ -9,10 +9,10 @@ interface SEOOptions {
   price?: string;
 }
 
-const SITE_NAME = "PUBG Account Manager";
-const DEFAULT_TITLE = "PUBG Account Manager — Premium Verified PUBG Mobile Accounts";
+const SITE_NAME = "CodexStocks";
+const DEFAULT_TITLE = "CodexStocks – Trusted PUBG Mobile Account Marketplace";
 const DEFAULT_DESCRIPTION =
-  "Pakistan's trusted marketplace for premium PUBG Mobile accounts. Buy verified accounts with rare skins, mythic items, X-Suits, and Glacier weapons.";
+  "Buy and sell PUBG Mobile accounts safely on CodexStocks. Verified listings, secure transfers, and a beginner-friendly experience you can trust.";
 const SITE_URL = "https://www.codexstocks.org";
 
 function setMeta(
@@ -60,7 +60,7 @@ export function useSEO({
   price,
 }: SEOOptions) {
   useEffect(() => {
-    const finalTitle = title ? `${title} — ${SITE_NAME}` : DEFAULT_TITLE;
+    const finalTitle = title ? `${title} | ${SITE_NAME}` : DEFAULT_TITLE;
     const finalDescription = description || DEFAULT_DESCRIPTION;
     const finalImage = image || `${SITE_URL}/opengraph.jpg`;
     const finalCanonical = canonical
@@ -76,6 +76,7 @@ export function useSEO({
     setMeta('meta[property="og:url"]', "property", "og:url", finalCanonical);
     setMeta('meta[property="og:type"]', "property", "og:type", type === "product" ? "og:product" : "website");
     setMeta('meta[property="og:site_name"]', "property", "og:site_name", SITE_NAME);
+    setMeta('meta[name="twitter:site"]', "name", "twitter:site", "@codexstocks");
     setMeta('meta[name="twitter:card"]', "name", "twitter:card", "summary_large_image");
     setMeta('meta[name="twitter:title"]', "name", "twitter:title", finalTitle);
     setMeta('meta[name="twitter:description"]', "name", "twitter:description", finalDescription);

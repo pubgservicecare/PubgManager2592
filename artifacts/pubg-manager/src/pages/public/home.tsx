@@ -22,8 +22,8 @@ export function PublicHome() {
   const [searchFocused, setSearchFocused] = useState(false);
 
   useSEO({
-    title: "Buy PUBG Mobile Accounts in Pakistan — Verified & Secure",
-    description: "Browse 100% verified PUBG Mobile accounts with mythic skins, X-Suits, Glacier weapons & rare items. Instant secure transfer. Pakistan's most trusted PUBG marketplace.",
+    title: "Buy & Sell PUBG Mobile Accounts Safely",
+    description: "Browse verified PUBG Mobile accounts with mythic skins, X-Suits, Glacier weapons and rare items. Secure transfers, transparent listings, and a buying experience built for trust.",
     canonical: "/",
   });
 
@@ -80,7 +80,7 @@ export function PublicHome() {
                   PUBG Mobile Account Marketplace
                 </h1>
                 <p className="text-slate-400 mt-1 text-sm sm:text-[15px] leading-relaxed max-w-2xl">
-                  Buy 100% verified PUBG Mobile accounts with mythic skins, X-Suits, Glacier weapons &amp; rare items — instant secure transfer, Pakistan's most trusted seller.
+                  Browse verified PUBG Mobile accounts with mythic skins, X-Suits, Glacier weapons and rare items — secure transfers, transparent listings, and a buying experience built for trust.
                 </p>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2.5">
                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
@@ -90,7 +90,7 @@ export function PublicHome() {
                     <Zap className="w-3 h-3" /> Instant Transfer
                   </span>
                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-400">
-                    <Star className="w-3 h-3 fill-current" /> Trusted in Pakistan
+                    <Star className="w-3 h-3 fill-current" /> Globally Trusted
                   </span>
                 </div>
               </header>
