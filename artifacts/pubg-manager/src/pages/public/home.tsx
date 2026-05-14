@@ -22,8 +22,9 @@ export function PublicHome() {
   const [searchFocused, setSearchFocused] = useState(false);
 
   useSEO({
-    title: "Buy Premium PUBG Mobile Accounts",
-    description: "Browse verified PUBG Mobile accounts with rare skins, mythic items, X-Suits, and Glacier weapons. Instant secure transfer guaranteed."
+    title: "Buy PUBG Mobile Accounts in Pakistan — Verified & Secure",
+    description: "Browse 100% verified PUBG Mobile accounts with mythic skins, X-Suits, Glacier weapons & rare items. Instant secure transfer. Pakistan's most trusted PUBG marketplace.",
+    canonical: "/",
   });
 
   const [search, setSearch] = useState("");
@@ -67,12 +68,33 @@ export function PublicHome() {
 
   return (
     <PublicLayout>
-      {/* === Variant B: Eldorado-style Marketplace (Hybrid Dark + Orange) === */}
       <section id="listings" className="bg-[#0B0F19] font-['Outfit'] selection:bg-orange-500/30 selection:text-orange-200 scroll-mt-24 flex-1">
         <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
           <div className="flex flex-col gap-6">
             {/* Main column */}
             <div className="flex-1 min-w-0">
+
+              {/* ── SEO Hero Heading ─────────────────────────────────── */}
+              <header className="mb-5">
+                <h1 className="text-xl sm:text-2xl font-display font-black text-white tracking-tight leading-tight">
+                  PUBG Mobile Account Marketplace
+                </h1>
+                <p className="text-slate-400 mt-1 text-sm sm:text-[15px] leading-relaxed max-w-2xl">
+                  Buy 100% verified PUBG Mobile accounts with mythic skins, X-Suits, Glacier weapons &amp; rare items — instant secure transfer, Pakistan's most trusted seller.
+                </p>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2.5">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
+                    <ShieldCheck className="w-3 h-3" /> 100% Verified Accounts
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-yellow-400">
+                    <Zap className="w-3 h-3" /> Instant Transfer
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-400">
+                    <Star className="w-3 h-3 fill-current" /> Trusted in Pakistan
+                  </span>
+                </div>
+              </header>
+
               {/* Toolbar */}
               <div className="flex flex-col gap-3 mb-6 bg-[#11151E] p-3 sm:p-4 rounded-xl border border-[#1E293B]">
                 <div className="flex flex-row items-center gap-2 sm:gap-3 flex-nowrap">
@@ -85,6 +107,7 @@ export function PublicHome() {
                       onFocus={() => setSearchFocused(true)}
                       onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
                       placeholder="Search accounts…"
+                      aria-label="Search PUBG Mobile accounts"
                       className="pl-9 pr-3 bg-[#0B0F19] border border-[#1E293B] text-slate-200 placeholder:text-slate-500 h-10 focus:outline-none focus:ring-2 focus:ring-orange-500 w-full rounded-md text-sm"
                       data-testid="marketplace-search"
                     />
@@ -256,7 +279,7 @@ export function PublicHome() {
                                 <>
                                   <img
                                     src={`/api/storage${imgs[0]}`}
-                                    alt={account.title}
+                                    alt={`${account.title} — Buy PUBG Mobile Account`}
                                     loading="lazy"
                                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                   />
