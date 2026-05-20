@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { pool } from "@workspace/db";
+import { backfillSlugs } from "./lib/slugify";
 
 const rawPort = process.env["PORT"];
 const port = rawPort ? Number(rawPort) : 8080;
@@ -19,6 +20,10 @@ async function start() {
     ) WITH (OIDS=FALSE);
     CREATE INDEX IF NOT EXISTS "IDX_user_sessions_expire" ON "user_sessions" ("expire");
   `);
+
+  await backfillSlugs().catch((err) => {
+    logger.warn({ err }, "Slug backfill failed — will retry on next restart");
+  });
 
   app.listen(port, (err) => {
     if (err) {

@@ -272,7 +272,7 @@ app.get("/sitemap.xml", async (req, res) => {
 
     // Fetch all active accounts for individual product pages
     const activeAccounts = await db
-      .select({ id: accountsTable.id, updatedAt: accountsTable.updatedAt })
+      .select({ id: accountsTable.id, updatedAt: accountsTable.updatedAt, slug: accountsTable.slug })
       .from(accountsTable)
       .where(eq(accountsTable.status, "active"));
 
@@ -293,7 +293,7 @@ app.get("/sitemap.xml", async (req, res) => {
     // Each active account listing is a unique product page Google should index.
     // Priority 0.9 — second only to the homepage.
     const accountUrls = activeAccounts.map((a) => ({
-      loc: `${origin}/account/${a.id}`,
+      loc: `${origin}/account/${a.slug || a.id}`,
       lastmod: a.updatedAt
         ? new Date(a.updatedAt).toISOString().split("T")[0]
         : new Date().toISOString().split("T")[0],

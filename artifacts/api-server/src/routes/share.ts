@@ -19,15 +19,18 @@ function absoluteUrl(req: any, path: string): string {
   return `${proto}://${host}${path}`;
 }
 
-router.get("/share/account/:id", async (req, res): Promise<void> => {
+router.get("/share/account/:idOrSlug", async (req, res): Promise<void> => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (!Number.isFinite(id)) {
-      res.status(400).json({ error: "Invalid account id" });
-      return;
+    const raw = req.params.idOrSlug;
+    const numId = parseInt(raw, 10);
+
+    let acc: typeof accountsTable.$inferSelect | undefined;
+    if (Number.isFinite(numId)) {
+      [acc] = await db.select().from(accountsTable).where(eq(accountsTable.id, numId));
+    } else {
+      [acc] = await db.select().from(accountsTable).where(eq(accountsTable.slug, raw));
     }
 
-    const [acc] = await db.select().from(accountsTable).where(eq(accountsTable.id, id));
     const [settings] = await db.select().from(settingsTable);
 
     if (!acc) {
@@ -35,8 +38,9 @@ router.get("/share/account/:id", async (req, res): Promise<void> => {
       return;
     }
 
-    const siteName = settings?.siteName || "PUBG Account Manager";
-    const accountUrl = absoluteUrl(req, `/account/${id}`);
+    const siteName = settings?.siteName || "CodexStocks";
+    const accountPath = acc.slug ? `/account/${acc.slug}` : `/account/${acc.id}`;
+    const accountUrl = absoluteUrl(req, accountPath);
 
     const title = `${acc.title} — ${siteName}`;
     const price = acc.priceForSale ? `PKR ${parseFloat(acc.priceForSale as string).toLocaleString()}` : "";
@@ -65,6 +69,8 @@ router.get("/share/account/:id", async (req, res): Promise<void> => {
 <meta property="og:url" content="${escapeHtml(accountUrl)}">
 <meta property="og:site_name" content="${escapeHtml(siteName)}">
 ${imageUrl ? `<meta property="og:image" content="${escapeHtml(imageUrl)}">` : ""}
+${imageUrl ? `<meta property="og:image:width" content="1200">` : ""}
+${imageUrl ? `<meta property="og:image:height" content="630">` : ""}
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escapeHtml(title)}">
 <meta name="twitter:description" content="${escapeHtml(desc)}">

@@ -10,6 +10,8 @@ import type { AccountStatus } from "./accountStatus";
 
 export interface Account {
   id: number;
+  /** @nullable */
+  slug?: string | null;
   title: string;
   accountId: string;
   /** @nullable */

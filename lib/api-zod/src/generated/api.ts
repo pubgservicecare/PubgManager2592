@@ -199,6 +199,7 @@ export const UpdateAccountStatusBody = zod.object({
 
 export const UpdateAccountStatusResponse = zod.object({
   id: zod.number(),
+  slug: zod.string().nullish(),
   title: zod.string(),
   accountId: zod.string(),
   purchasePrice: zod.number().nullish(),
@@ -281,6 +282,7 @@ export const ListAccountsQueryParams = zod.object({
 
 export const ListAccountsResponseItem = zod.object({
   id: zod.number(),
+  slug: zod.string().nullish(),
   title: zod.string(),
   accountId: zod.string(),
   purchasePrice: zod.number().nullish(),
@@ -354,6 +356,76 @@ export const CreateAccountBody = zod.object({
 });
 
 /**
+ * @summary Get account details by SEO-friendly slug
+ */
+export const GetAccountBySlugParams = zod.object({
+  slug: zod.coerce.string(),
+});
+
+export const GetAccountBySlugQueryParams = zod.object({
+  public: zod.coerce.boolean().optional(),
+});
+
+export const GetAccountBySlugResponse = zod.object({
+  id: zod.number(),
+  slug: zod.string().nullish(),
+  title: zod.string(),
+  accountId: zod.string(),
+  purchasePrice: zod.number().nullish(),
+  priceForSale: zod.number(),
+  finalSoldPrice: zod.number().nullish(),
+  purchaseDate: zod.string().nullish(),
+  previousOwnerContact: zod.string().nullish(),
+  videoUrl: zod.string().nullish(),
+  imageUrls: zod.array(zod.string()).optional(),
+  description: zod.string().nullish(),
+  status: zod.enum([
+    "active",
+    "reserved",
+    "under_review",
+    "hidden",
+    "sold",
+    "installment",
+  ]),
+  customerId: zod.number().nullish(),
+  customerName: zod.string().nullish(),
+  customerContact: zod.string().nullish(),
+  sellerId: zod.number().nullish(),
+  sellerName: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+  links: zod.array(
+    zod.object({
+      id: zod.number(),
+      accountId: zod.number(),
+      type: zod.enum([
+        "twitter",
+        "google",
+        "facebook",
+        "game_center",
+        "apple",
+        "tiktok",
+        "whatsapp",
+        "number",
+        "mail",
+      ]),
+      login: zod.string(),
+      password: zod.string(),
+      value: zod.string(),
+      status: zod.enum(["old_owner", "my_controlled", "transferred"]),
+      isPending: zod.boolean(),
+      createdAt: zod.string(),
+    }),
+  ),
+  pendingLinksCount: zod.number(),
+  totalPaid: zod.number().nullish(),
+  remainingAmount: zod.number().nullish(),
+  nextDueDate: zod.string().nullish(),
+  overdueCount: zod.number().nullish(),
+  dueSoonCount: zod.number().nullish(),
+});
+
+/**
  * @summary Get account details
  */
 export const GetAccountParams = zod.object({
@@ -366,6 +438,7 @@ export const GetAccountQueryParams = zod.object({
 
 export const GetAccountResponse = zod.object({
   id: zod.number(),
+  slug: zod.string().nullish(),
   title: zod.string(),
   accountId: zod.string(),
   purchasePrice: zod.number().nullish(),
@@ -453,6 +526,7 @@ export const UpdateAccountBody = zod.object({
 
 export const UpdateAccountResponse = zod.object({
   id: zod.number(),
+  slug: zod.string().nullish(),
   title: zod.string(),
   accountId: zod.string(),
   purchasePrice: zod.number().nullish(),
@@ -533,6 +607,7 @@ export const SellAccountBody = zod.object({
 
 export const SellAccountResponse = zod.object({
   id: zod.number(),
+  slug: zod.string().nullish(),
   title: zod.string(),
   accountId: zod.string(),
   purchasePrice: zod.number().nullish(),
@@ -892,6 +967,7 @@ export const ListCustomersResponseItem = zod.object({
   deals: zod.array(
     zod.object({
       id: zod.number(),
+      slug: zod.string().nullish(),
       title: zod.string(),
       accountId: zod.string(),
       purchasePrice: zod.number().nullish(),
@@ -966,6 +1042,7 @@ export const GetCustomerResponse = zod.object({
   deals: zod.array(
     zod.object({
       id: zod.number(),
+      slug: zod.string().nullish(),
       title: zod.string(),
       accountId: zod.string(),
       purchasePrice: zod.number().nullish(),
@@ -1044,6 +1121,7 @@ export const UpdateCustomerResponse = zod.object({
   deals: zod.array(
     zod.object({
       id: zod.number(),
+      slug: zod.string().nullish(),
       title: zod.string(),
       accountId: zod.string(),
       purchasePrice: zod.number().nullish(),

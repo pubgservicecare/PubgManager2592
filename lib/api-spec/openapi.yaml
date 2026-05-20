@@ -319,6 +319,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/Account"
 
+  /accounts/slug/{slug}:
+    get:
+      operationId: getAccountBySlug
+      tags: [accounts]
+      summary: Get account details by SEO-friendly slug
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: public
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Account details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "404":
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /accounts/{id}:
     get:
       operationId: getAccount
@@ -1140,6 +1169,8 @@ components:
       properties:
         id:
           type: integer
+        slug:
+          type: ["string", "null"]
         title:
           type: string
         accountId:

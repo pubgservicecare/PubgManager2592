@@ -33,6 +33,7 @@ import type {
   EditPaymentBody,
   ErrorEnvelope,
   ErrorResponse,
+  GetAccountBySlugParams,
   GetAccountParams,
   HealthStatus,
   HistoryEntry,
@@ -1156,6 +1157,116 @@ export const useCreateAccount = <
 > => {
   return useMutation(getCreateAccountMutationOptions(options));
 };
+
+/**
+ * @summary Get account details by SEO-friendly slug
+ */
+export const getGetAccountBySlugUrl = (
+  slug: string,
+  params?: GetAccountBySlugParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/accounts/slug/${slug}?${stringifiedParams}`
+    : `/api/accounts/slug/${slug}`;
+};
+
+export const getAccountBySlug = async (
+  slug: string,
+  params?: GetAccountBySlugParams,
+  options?: RequestInit,
+): Promise<Account> => {
+  return customFetch<Account>(getGetAccountBySlugUrl(slug, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAccountBySlugQueryKey = (
+  slug: string,
+  params?: GetAccountBySlugParams,
+) => {
+  return [`/api/accounts/slug/${slug}`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetAccountBySlugQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAccountBySlug>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  slug: string,
+  params?: GetAccountBySlugParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountBySlug>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAccountBySlugQueryKey(slug, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAccountBySlug>>
+  > = ({ signal }) =>
+    getAccountBySlug(slug, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!slug,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAccountBySlug>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAccountBySlugQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAccountBySlug>>
+>;
+export type GetAccountBySlugQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get account details by SEO-friendly slug
+ */
+
+export function useGetAccountBySlug<
+  TData = Awaited<ReturnType<typeof getAccountBySlug>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  slug: string,
+  params?: GetAccountBySlugParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAccountBySlug>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAccountBySlugQueryOptions(slug, params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get account details

@@ -3,6 +3,7 @@ import { eq, desc, isNull, and, inArray, sql } from "drizzle-orm";
 import { db, accountsTable, accountLinksTable, paymentsTable, customersTable, historyTable, sellersTable } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLog";
+import { generateUniqueSlug } from "../lib/slugify";
 
 const router: IRouter = Router();
 
@@ -70,6 +71,7 @@ async function buildAccountResponse(account: any, isAdmin = true) {
 
   const result: any = {
     id: account.id,
+    slug: account.slug ?? null,
     title: account.title,
     accountId: account.accountId,
     priceForSale: parseFloat(account.priceForSale as string),
@@ -297,8 +299,10 @@ router.post("/accounts", requireAdmin, async (req, res): Promise<void> => {
     return;
   }
 
+  const slug = await generateUniqueSlug(title);
   const [account] = await db.insert(accountsTable).values({
     title,
+    slug,
     accountId,
     purchasePrice: purchasePrice?.toString(),
     priceForSale: priceForSale.toString(),
@@ -323,6 +327,25 @@ router.post("/accounts", requireAdmin, async (req, res): Promise<void> => {
   });
 
   res.status(201).json(await buildAccountResponse(account, true));
+});
+
+router.get("/accounts/slug/:slug", async (req, res): Promise<void> => {
+  const slug = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
+  const isPublic = req.query.public === "true";
+  const isAdmin = (req as any).session?.isAdmin;
+
+  const [account] = await db.select().from(accountsTable).where(eq(accountsTable.slug, slug));
+  if (!account || account.deletedAt) {
+    res.status(404).json({ error: "Account not found" });
+    return;
+  }
+
+  if ((isPublic || !isAdmin) && (!PUBLIC_VISIBLE_STATUSES.has(account.status) || (account.visibility ?? "public") !== "public")) {
+    res.status(404).json({ error: "Account not found" });
+    return;
+  }
+
+  res.json(await buildAccountResponse(account, isAdmin && !isPublic));
 });
 
 router.get("/accounts/:id", async (req, res): Promise<void> => {
@@ -357,7 +380,10 @@ router.patch("/accounts/:id", requireAdmin, async (req, res): Promise<void> => {
 
   const { title, accountId, purchasePrice, priceForSale, purchaseDate, previousOwnerContact, videoUrl, imageUrls, description, status } = req.body;
   const updates: Record<string, any> = {};
-  if (title !== undefined) updates.title = title;
+  if (title !== undefined) {
+    updates.title = title;
+    updates.slug = await generateUniqueSlug(title, id);
+  }
   if (accountId !== undefined) updates.accountId = accountId;
   if (purchasePrice !== undefined) updates.purchasePrice = purchasePrice?.toString();
   if (priceForSale !== undefined) updates.priceForSale = priceForSale.toString();

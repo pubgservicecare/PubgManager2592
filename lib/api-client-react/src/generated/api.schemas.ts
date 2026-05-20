@@ -180,6 +180,8 @@ export interface AccountLink {
 
 export interface Account {
   id: number;
+  /** @nullable */
+  slug?: string | null;
   title: string;
   accountId: string;
   /** @nullable */
@@ -584,6 +586,10 @@ export const ListAccountsStatus = {
   sold: "sold",
   installment: "installment",
 } as const;
+
+export type GetAccountBySlugParams = {
+  public?: boolean;
+};
 
 export type GetAccountParams = {
   public?: boolean;

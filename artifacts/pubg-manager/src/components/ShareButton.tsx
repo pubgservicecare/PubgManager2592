@@ -14,19 +14,22 @@ import {
 export function ShareButton({
   accountId,
   title,
+  slug,
   className = "",
 }: {
   accountId: number;
   title: string;
+  slug?: string | null;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const shareKey = slug || accountId;
   const shareUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}/api/share/account/${accountId}`
-      : `/api/share/account/${accountId}`;
+      ? `${window.location.origin}/api/share/account/${shareKey}`
+      : `/api/share/account/${shareKey}`;
 
   const message = `Check out this PUBG account: ${title}`;
   const fullMessage = `${message}\n${shareUrl}`;

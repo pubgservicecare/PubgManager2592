@@ -31,6 +31,7 @@ export * from "./dueAlertItem";
 export * from "./editPaymentBody";
 export * from "./errorEnvelope";
 export * from "./errorResponse";
+export * from "./getAccountBySlugParams";
 export * from "./getAccountParams";
 export * from "./healthStatus";
 export * from "./historyEntry";

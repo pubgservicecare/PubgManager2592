@@ -1,6 +1,6 @@
 import { PublicLayout } from "@/components/PublicLayout";
-import { useGetAccount, useGetSettings } from "@workspace/api-client-react";
-import { useRoute } from "wouter";
+import { useGetAccount, useGetAccountBySlug, useGetSettings } from "@workspace/api-client-react";
+import { useRoute, useLocation } from "wouter";
 import { formatCurrency } from "@/lib/helpers";
 import {
   MessageSquare,
@@ -219,16 +219,37 @@ function HowItWorks() {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export function PublicAccountDetail() {
   const [, params] = useRoute("/account/:id");
-  const id = parseInt(params?.id || "0");
+  const [, setLocation] = useLocation();
 
-  const { data: account, isLoading, isError } = useGetAccount(id, {
-    public: true,
-  });
+  const rawParam = params?.id || "";
+  const isNumericParam = /^\d+$/.test(rawParam);
+  const numericId = isNumericParam ? parseInt(rawParam, 10) : 0;
+
+  const { data: accountById, isLoading: loadingById, isError: errorById } = useGetAccount(
+    numericId,
+    { public: true },
+    { enabled: isNumericParam, retry: false } as any,
+  );
+
+  const { data: accountBySlug, isLoading: loadingBySlug, isError: errorBySlug } = useGetAccountBySlug(
+    rawParam,
+    { public: true },
+    { enabled: !isNumericParam, retry: false } as any,
+  );
+
+  const account = isNumericParam ? accountById : accountBySlug;
+  const isLoading = isNumericParam ? loadingById : loadingBySlug;
+  const isError = isNumericParam ? errorById : errorBySlug;
+  const id = account?.id ?? numericId;
+
   const { data: settings } = useGetSettings();
 
   const price = account
     ? String(Number(account.priceForSale ?? 0))
     : undefined;
+
+  const accountSlug = (account as any)?.slug as string | null | undefined;
+  const canonicalPath = accountSlug ? `/account/${accountSlug}` : `/account/${id}`;
 
   useSEO({
     title: account
@@ -237,10 +258,19 @@ export function PublicAccountDetail() {
     description: account
       ? `Buy ${account.title} for ${formatCurrency(account.priceForSale)}. Verified PUBG Mobile account — instant secure transfer guaranteed. ${account.description?.slice(0, 80) || ""}`
       : undefined,
-    canonical: `/account/${id}`,
+    canonical: canonicalPath,
+    image: account && (account as any).imageUrls?.length > 0
+      ? `${SITE_URL}/api/storage${(account as any).imageUrls[0]}`
+      : undefined,
     type: "product",
     price,
   });
+
+  useEffect(() => {
+    if (isNumericParam && accountById && (accountById as any).slug) {
+      setLocation(`/account/${(accountById as any).slug}`, { replace: true } as any);
+    }
+  }, [isNumericParam, (accountById as any)?.slug]);
 
   useEffect(() => {
     if (!id || !account) return;
@@ -251,7 +281,7 @@ export function PublicAccountDetail() {
   // WhatsApp — auto-includes full account context so buyer doesn't need to explain
   const handleWhatsApp = () => {
     if (!settings?.whatsappNumber || !account) return;
-    const link = `${SITE_URL}/account/${id}`;
+    const link = accountSlug ? `${SITE_URL}/account/${accountSlug}` : `${SITE_URL}/account/${id}`;
     const msg =
       `Hi! I'm interested in buying this PUBG account:\n\n` +
       `🎮 *${account.title}*\n` +
@@ -479,6 +509,7 @@ export function PublicAccountDetail() {
                       onLiveChat={handleLiveChat}
                       accountId={id}
                       title={account.title}
+                      slug={accountSlug}
                     />
                   </div>
                 </div>
@@ -546,11 +577,13 @@ function CTAButtons({
   onLiveChat,
   accountId,
   title,
+  slug,
 }: {
   onWhatsApp: () => void;
   onLiveChat: () => void;
   accountId: number;
   title: string;
+  slug?: string | null;
 }) {
   return (
     <div className="space-y-2.5">
@@ -575,7 +608,7 @@ function CTAButtons({
       {/* Tertiary: Save + Share */}
       <div className="grid grid-cols-2 gap-2">
         <WishlistButton accountId={accountId} variant="button" />
-        <ShareButton accountId={accountId} title={title} />
+        <ShareButton accountId={accountId} title={title} slug={slug} />
       </div>
     </div>
   );
