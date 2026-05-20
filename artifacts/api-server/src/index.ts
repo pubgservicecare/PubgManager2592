@@ -21,16 +21,18 @@ async function start() {
     CREATE INDEX IF NOT EXISTS "IDX_user_sessions_expire" ON "user_sessions" ("expire");
   `);
 
-  await backfillSlugs().catch((err) => {
-    logger.warn({ err }, "Slug backfill failed — will retry on next restart");
-  });
-
   app.listen(port, (err) => {
     if (err) {
       logger.error({ err }, "Error listening on port");
       process.exit(1);
     }
     logger.info({ port }, "Server listening");
+
+    // Run slug backfill in the background after server is ready.
+    // This must NOT block startup — on a large DB it can take seconds.
+    backfillSlugs().catch((err) => {
+      logger.warn({ err }, "Slug backfill failed — will retry on next restart");
+    });
   });
 }
 

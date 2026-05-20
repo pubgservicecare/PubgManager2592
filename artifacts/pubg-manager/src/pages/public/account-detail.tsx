@@ -228,13 +228,13 @@ export function PublicAccountDetail() {
   const { data: accountById, isLoading: loadingById, isError: errorById } = useGetAccount(
     numericId,
     { public: true },
-    { enabled: isNumericParam, retry: false } as any,
+    { query: { enabled: isNumericParam, retry: false } } as any,
   );
 
   const { data: accountBySlug, isLoading: loadingBySlug, isError: errorBySlug } = useGetAccountBySlug(
     rawParam,
     { public: true },
-    { enabled: !isNumericParam, retry: false } as any,
+    { query: { enabled: !isNumericParam, retry: false } } as any,
   );
 
   const account = isNumericParam ? accountById : accountBySlug;
