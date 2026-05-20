@@ -560,11 +560,20 @@ export function AdminSettings() {
                   </div>
 
                   {form.storageProvider === "local" && (
-                    <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-xl p-4 flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 mt-0.5 shrink-0" />
-                      <div className="text-sm">
-                        <p className="font-bold mb-1">Local Storage Active</p>
-                        <p className="opacity-80">Files are stored on the server's disk. This works out of the box without any extra configuration. When you're ready to scale, switch to Google Cloud Storage above.</p>
+                    <div className="space-y-3">
+                      <div className="bg-destructive/10 border border-destructive/40 text-red-300 rounded-xl p-4 flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0 text-red-400" />
+                        <div className="text-sm">
+                          <p className="font-bold mb-1 text-red-300">⚠️ Images WILL be lost on every redeploy!</p>
+                          <p className="opacity-90 leading-relaxed">
+                            Local storage saves files to the server's disk. On cloud hosting like <strong>Render</strong>, the disk is wiped every time a new version is deployed — all uploaded images are permanently deleted. <br /><br />
+                            <strong>Switch to Google Cloud Storage</strong> above to keep your images permanently. It only takes 3 fields and has a generous free tier (5 GB free).
+                          </p>
+                        </div>
+                      </div>
+                      <div className="bg-secondary/30 border border-border rounded-xl p-3 flex items-center gap-2 text-xs text-muted-foreground">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        Local storage works fine for local development only.
                       </div>
                     </div>
                   )}

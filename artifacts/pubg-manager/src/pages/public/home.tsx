@@ -275,31 +275,31 @@ export function PublicHome() {
                         <Link href={`/account/${account.id}`}>
                           <div className="group relative overflow-hidden rounded-xl border border-[#1E293B] bg-[#11151E] hover:border-orange-500/30 hover:shadow-[0_0_20px_rgba(249,115,22,0.08)] transition-all duration-300 flex flex-col h-full cursor-pointer active:scale-[0.99]">
                             <div className="relative aspect-[4/3] w-full overflow-hidden">
-                              {imgs.length > 0 ? (
+                              {/* Gradient fallback — always visible, shows when image is absent or fails to load */}
+                              <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-80`} />
+                              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-[#11151E]/60 to-[#11151E]" />
+                              <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
+                                {account.videoUrl ? (
+                                  <div className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white">
+                                    <Play className="w-5 h-5 ml-1" />
+                                  </div>
+                                ) : (
+                                  <span className="font-display text-xl font-black italic tracking-tighter text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] -rotate-3 group-hover:scale-110 transition-transform duration-500 line-clamp-2">
+                                    {account.title}
+                                  </span>
+                                )}
+                              </div>
+                              {/* Image on top — hidden automatically if it fails to load (404) */}
+                              {imgs.length > 0 && (
                                 <>
                                   <img
                                     src={`/api/storage${imgs[0]}`}
                                     alt={`${account.title} — Buy PUBG Mobile Account`}
                                     loading="lazy"
+                                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                   />
                                   <div className="absolute inset-0 bg-gradient-to-t from-[#11151E] via-[#11151E]/30 to-transparent pointer-events-none" />
-                                </>
-                              ) : (
-                                <>
-                                  <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-80`} />
-                                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-[#11151E]/60 to-[#11151E]" />
-                                  <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-                                    {account.videoUrl ? (
-                                      <div className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white">
-                                        <Play className="w-5 h-5 ml-1" />
-                                      </div>
-                                    ) : (
-                                      <span className="font-display text-xl font-black italic tracking-tighter text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] -rotate-3 group-hover:scale-110 transition-transform duration-500 line-clamp-2">
-                                        {account.title}
-                                      </span>
-                                    )}
-                                  </div>
                                 </>
                               )}
 

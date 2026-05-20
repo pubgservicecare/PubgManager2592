@@ -406,17 +406,17 @@ export function AdminAccountsList() {
                   <div className="cursor-pointer">
                     {/* Image */}
                     <div className="relative aspect-[4/3] bg-secondary overflow-hidden">
-                      {cover ? (
+                      <div className="absolute inset-0 w-full h-full flex items-center justify-center">
+                        <ImageIcon className="w-12 h-12 text-muted-foreground/30" />
+                      </div>
+                      {cover && (
                         <img
                           src={`/api/storage${cover}`}
                           alt={acc.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                           loading="lazy"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                         />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <ImageIcon className="w-12 h-12 text-muted-foreground/30" />
-                        </div>
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/0 to-black/40 pointer-events-none" />
 
