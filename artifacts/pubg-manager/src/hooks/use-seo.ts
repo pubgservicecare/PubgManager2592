@@ -1,5 +1,10 @@
 import { useEffect } from "react";
 
+interface BreadcrumbItem {
+  name: string;
+  url: string;
+}
+
 interface SEOOptions {
   title?: string;
   description?: string;
@@ -7,6 +12,7 @@ interface SEOOptions {
   canonical?: string;
   type?: "website" | "product";
   price?: string;
+  breadcrumbs?: BreadcrumbItem[];
 }
 
 const SITE_NAME = "CodexStocks";
@@ -58,6 +64,7 @@ export function useSEO({
   canonical,
   type = "website",
   price,
+  breadcrumbs,
 }: SEOOptions) {
   useEffect(() => {
     const finalTitle = title ? `${title} | ${SITE_NAME}` : DEFAULT_TITLE;
@@ -74,7 +81,7 @@ export function useSEO({
     setMeta('meta[property="og:description"]', "property", "og:description", finalDescription);
     setMeta('meta[property="og:image"]', "property", "og:image", finalImage);
     setMeta('meta[property="og:url"]', "property", "og:url", finalCanonical);
-    setMeta('meta[property="og:type"]', "property", "og:type", type === "product" ? "og:product" : "website");
+    setMeta('meta[property="og:type"]', "property", "og:type", type === "product" ? "product" : "website");
     setMeta('meta[property="og:site_name"]', "property", "og:site_name", SITE_NAME);
     setMeta('meta[name="twitter:site"]', "name", "twitter:site", "@codexstocks");
     setMeta('meta[name="twitter:card"]', "name", "twitter:card", "summary_large_image");
@@ -92,17 +99,36 @@ export function useSEO({
         description: finalDescription,
         image: finalImage,
         url: finalCanonical,
+        brand: {
+          "@type": "Organization",
+          name: SITE_NAME,
+        },
         offers: {
           "@type": "Offer",
           priceCurrency: "PKR",
           price,
           availability: "https://schema.org/InStock",
+          url: finalCanonical,
           seller: {
             "@type": "Organization",
             name: SITE_NAME,
+            url: SITE_URL,
           },
         },
       });
     }
-  }, [title, description, image, canonical, type, price]);
+
+    if (breadcrumbs && breadcrumbs.length > 0) {
+      setJsonLd("breadcrumb", {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: breadcrumbs.map((crumb, i) => ({
+          "@type": "ListItem",
+          position: i + 1,
+          name: crumb.name,
+          item: crumb.url,
+        })),
+      });
+    }
+  }, [title, description, image, canonical, type, price, breadcrumbs]);
 }

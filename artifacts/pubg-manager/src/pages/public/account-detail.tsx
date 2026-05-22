@@ -1,6 +1,6 @@
 import { PublicLayout } from "@/components/PublicLayout";
-import { useGetAccount, useGetAccountBySlug, useGetSettings } from "@workspace/api-client-react";
-import { useRoute, useLocation } from "wouter";
+import { useGetAccount, useGetAccountBySlug, useGetSettings, useListAccounts } from "@workspace/api-client-react";
+import { useRoute, useLocation, Link } from "wouter";
 import { formatCurrency } from "@/lib/helpers";
 import {
   MessageSquare,
@@ -20,7 +20,6 @@ import { useSEO } from "@/hooks/use-seo";
 import { WishlistButton } from "@/components/WishlistButton";
 import { ShareButton } from "@/components/ShareButton";
 import { addRecentlyViewed } from "@/lib/recently-viewed";
-import { Link } from "wouter";
 
 const SITE_URL = "https://www.codexstocks.org";
 
@@ -258,6 +257,11 @@ export function PublicAccountDetail() {
   const accountSlug = (account as any)?.slug as string | null | undefined;
   const canonicalPath = accountSlug ? `/account/${accountSlug}` : `/account/${id}`;
 
+  const { data: allAccounts } = useListAccounts({ status: "active", public: true } as any);
+  const relatedAccounts = (allAccounts ?? [])
+    .filter((a) => a.id !== id)
+    .slice(0, 4);
+
   useSEO({
     title: account
       ? `${account.title} — Buy PUBG Account`
@@ -271,6 +275,11 @@ export function PublicAccountDetail() {
       : undefined,
     type: "product",
     price,
+    breadcrumbs: account ? [
+      { name: "Home", url: `${SITE_URL}/` },
+      { name: "All Accounts", url: `${SITE_URL}/accounts` },
+      { name: account.title, url: `${SITE_URL}${canonicalPath}` },
+    ] : undefined,
   });
 
   useEffect(() => {
@@ -532,6 +541,50 @@ export function PublicAccountDetail() {
           </div>
         </div>
       </div>
+
+      {/* ── More accounts (internal linking + SEO) ───────────────────────────── */}
+      {relatedAccounts.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 pb-6 pt-2" aria-label="More PUBG accounts for sale">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest">More Accounts</h2>
+            <Link href="/accounts" className="text-xs text-orange-400 hover:text-orange-300 font-medium transition-colors">
+              View all →
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {relatedAccounts.map((rel) => {
+              const relSlug = (rel as any).slug as string | undefined;
+              const relHref = relSlug ? `/account/${relSlug}` : `/account/${rel.id}`;
+              const relImgs = ((rel as any).imageUrls ?? []) as string[];
+              return (
+                <Link key={rel.id} href={relHref}>
+                  <article className="group relative overflow-hidden rounded-xl border border-[#1E293B] bg-[#11151E] hover:border-orange-500/30 transition-all cursor-pointer">
+                    <div className="aspect-[4/3] relative overflow-hidden bg-[#0B0F19]">
+                      {relImgs.length > 0 ? (
+                        <img
+                          src={`/api/storage${relImgs[0]}`}
+                          alt={`${rel.title} — Buy PUBG Account`}
+                          loading="lazy"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center p-2">
+                          <span className="text-[10px] text-slate-500 font-medium text-center line-clamp-2">{rel.title}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2.5">
+                      <p className="text-[11px] text-slate-400 font-medium line-clamp-1 mb-0.5">{rel.title}</p>
+                      <p className="text-xs font-bold text-orange-400">{formatCurrency((rel as any).priceForSale)}</p>
+                    </div>
+                  </article>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ── MOBILE: Sticky bottom CTA bar ──────────────────────────────────── */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-50">

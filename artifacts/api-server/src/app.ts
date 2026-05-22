@@ -282,24 +282,28 @@ app.get("/sitemap.xml", async (req, res) => {
     //   • Have real SEO value (exclude /login, /chat sessions, seller portal, admin)
     const staticUrls: Array<{ loc: string; changefreq: string; priority: string; lastmod?: string }> = [
       // Homepage — highest priority, changes daily as inventory updates
-      { loc: `${origin}/`,      changefreq: "daily",   priority: "1.0" },
+      { loc: `${origin}/`,       changefreq: "daily",   priority: "1.0" },
+      // Accounts hub — crawl discovery page, links to all listings
+      { loc: `${origin}/accounts`, changefreq: "daily", priority: "0.9" },
       // FAQ — helpful long-tail content, updated occasionally
-      { loc: `${origin}/faq`,   changefreq: "weekly",  priority: "0.7" },
+      { loc: `${origin}/faq`,    changefreq: "weekly",  priority: "0.7" },
       // Signup — brings new customers, indexed for brand searches
       { loc: `${origin}/signup`, changefreq: "monthly", priority: "0.5" },
     ];
 
     // ── Dynamic account pages (product pages — highest SEO value) ───────────
     // Each active account listing is a unique product page Google should index.
-    // Priority 0.9 — second only to the homepage.
-    const accountUrls = activeAccounts.map((a) => ({
-      loc: `${origin}/account/${a.slug || a.id}`,
-      lastmod: a.updatedAt
-        ? new Date(a.updatedAt).toISOString().split("T")[0]
-        : new Date().toISOString().split("T")[0],
-      changefreq: "weekly",
-      priority: "0.9",
-    }));
+    // Skip accounts that have no slug — numeric URLs are not for public indexing.
+    const accountUrls = activeAccounts
+      .filter((a) => !!a.slug)
+      .map((a) => ({
+        loc: `${origin}/account/${a.slug}`,
+        lastmod: a.updatedAt
+          ? new Date(a.updatedAt).toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0],
+        changefreq: "weekly",
+        priority: "0.9",
+      }));
 
     // Accounts first (most valuable for SEO), then static pages
     const allUrls = [...accountUrls, ...staticUrls];

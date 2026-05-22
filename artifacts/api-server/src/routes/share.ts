@@ -39,8 +39,11 @@ router.get("/share/account/:idOrSlug", async (req, res): Promise<void> => {
     }
 
     const siteName = settings?.siteName || "CodexStocks";
+    // Always use slug URL for canonical — numeric IDs are internal only
     const accountPath = acc.slug ? `/account/${acc.slug}` : `/account/${acc.id}`;
+    const canonicalPath = acc.slug ? `/account/${acc.slug}` : accountPath;
     const accountUrl = absoluteUrl(req, accountPath);
+    const canonicalUrl = absoluteUrl(req, canonicalPath);
 
     const title = `${acc.title} — ${siteName}`;
     const price = acc.priceForSale ? `PKR ${parseFloat(acc.priceForSale as string).toLocaleString()}` : "";
@@ -62,11 +65,11 @@ router.get("/share/account/:idOrSlug", async (req, res): Promise<void> => {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(desc)}">
-<link rel="canonical" href="${escapeHtml(accountUrl)}">
+<link rel="canonical" href="${escapeHtml(canonicalUrl)}">
 <meta property="og:type" content="product">
 <meta property="og:title" content="${escapeHtml(title)}">
 <meta property="og:description" content="${escapeHtml(desc)}">
-<meta property="og:url" content="${escapeHtml(accountUrl)}">
+<meta property="og:url" content="${escapeHtml(canonicalUrl)}">
 <meta property="og:site_name" content="${escapeHtml(siteName)}">
 ${imageUrl ? `<meta property="og:image" content="${escapeHtml(imageUrl)}">` : ""}
 ${imageUrl ? `<meta property="og:image:width" content="1200">` : ""}

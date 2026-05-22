@@ -32,22 +32,28 @@
     <meta name="twitter:description" content="100% verified PUBG Mobile accounts with mythic skins, X-Suits &amp; Glacier weapons. Instant secure transfer. Pakistan's most trusted marketplace." />
     <meta name="twitter:image" content="https://www.codexstocks.org/opengraph.jpg" />
 
-    <!-- Structured Data: Organization -->
+    <!-- Structured Data: Organization — covers all brand name variations so Google understands CodexStocks = Code X Stocks -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "Organization",
-      "name": "Codex Stocks",
-      "alternateName": "PUBG Account Manager",
+      "name": "CodexStocks",
+      "alternateName": ["Code X Stocks", "Codex Stocks", "codexstock", "CodexStock"],
       "description": "Pakistan's most trusted marketplace for verified PUBG Mobile accounts with rare skins, mythic items, and instant secure transfer.",
       "url": "https://www.codexstocks.org",
-      "logo": "https://www.codexstocks.org/favicon.svg",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.codexstocks.org/favicon.svg",
+        "width": 512,
+        "height": 512
+      },
       "contactPoint": {
         "@type": "ContactPoint",
         "contactType": "customer support",
         "availableLanguage": ["English", "Urdu"]
       },
       "areaServed": "PK",
+      "knowsAbout": ["PUBG Mobile", "PUBG accounts", "gaming accounts", "mythic skins"],
       "sameAs": []
     }
     </script>
@@ -57,7 +63,8 @@
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
-      "name": "Codex Stocks",
+      "name": "CodexStocks",
+      "alternateName": "Code X Stocks",
       "url": "https://www.codexstocks.org",
       "description": "Buy and sell verified PUBG Mobile accounts in Pakistan. Mythic skins, X-Suits, Glacier weapons, and rare items with instant secure transfer.",
       "inLanguage": "en-PK",
@@ -72,25 +79,15 @@
     }
     </script>
 
-    <!-- Structured Data: ItemList (Marketplace) -->
+    <!-- Structured Data: ItemList Marketplace page -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebPage",
-      "name": "PUBG Mobile Account Marketplace",
-      "url": "https://www.codexstocks.org/",
-      "description": "Browse verified PUBG Mobile accounts for sale in Pakistan. All accounts verified with instant secure transfer.",
-      "breadcrumb": {
-        "@type": "BreadcrumbList",
-        "itemListElement": [
-          {
-            "@type": "ListItem",
-            "position": 1,
-            "name": "Home",
-            "item": "https://www.codexstocks.org/"
-          }
-        ]
-      }
+      "@type": "ItemList",
+      "name": "PUBG Mobile Accounts for Sale",
+      "description": "Browse all verified PUBG Mobile accounts available for sale in Pakistan on CodexStocks.",
+      "url": "https://www.codexstocks.org/accounts",
+      "numberOfItems": 0
     }
     </script>
 

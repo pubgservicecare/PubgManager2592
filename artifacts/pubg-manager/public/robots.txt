@@ -7,6 +7,7 @@ User-agent: *
 # ── Public pages — allow crawling ───────────────────────────────────────────
 Allow: /$
 Allow: /account/
+Allow: /accounts$
 Allow: /faq$
 Allow: /signup$
 

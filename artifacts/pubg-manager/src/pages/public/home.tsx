@@ -272,7 +272,7 @@ export function PublicHome() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: Math.min(index * 0.04, 0.4) }}
                       >
-                        <Link href={`/account/${account.id}`}>
+                        <Link href={`/account/${(account as any).slug || account.id}`}>
                           <div className="group relative overflow-hidden rounded-xl border border-[#1E293B] bg-[#11151E] hover:border-orange-500/30 hover:shadow-[0_0_20px_rgba(249,115,22,0.08)] transition-all duration-300 flex flex-col h-full cursor-pointer active:scale-[0.99]">
                             <div className="relative aspect-[4/3] w-full overflow-hidden">
                               {/* Gradient fallback — always visible, shows when image is absent or fails to load */}
@@ -379,6 +379,13 @@ export function PublicHome() {
           </div>
         </div>
       </section>
+
+      {/* "View all accounts" internal link for SEO crawlability */}
+      <div className="text-center py-6">
+        <a href="/accounts" className="inline-flex items-center gap-1.5 text-sm text-orange-400 hover:text-orange-300 font-medium transition-colors">
+          View all accounts →
+        </a>
+      </div>
 
     </PublicLayout>
   );
