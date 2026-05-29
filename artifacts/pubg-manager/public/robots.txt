@@ -4,20 +4,21 @@
 
 User-agent: *
 
-# ── Public pages — allow crawling ───────────────────────────────────────────
-Allow: /$
+# ── Public pages — explicitly allow crawling ─────────────────────────────────
+Allow: /
 Allow: /account/
-Allow: /accounts$
-Allow: /faq$
-Allow: /signup$
+Allow: /accounts
+Allow: /faq
+Allow: /signup
 
 # ── Private portals — block completely ──────────────────────────────────────
 Disallow: /admin
-Disallow: /my
+Disallow: /my/
 Disallow: /seller/
 
-# ── Auth pages — low SEO value, no need to crawl ───────────────────────────
+# ── Auth pages — low SEO value, skip ────────────────────────────────────────
 Disallow: /login
+Disallow: /signup/
 Disallow: /chat
 
 # ── API and internal endpoints ───────────────────────────────────────────────

@@ -9,8 +9,9 @@ import { logger } from "./lib/logger";
 import path from "path";
 import { fileURLToPath } from "url";
 import { db } from "@workspace/db";
-import { accountsTable } from "@workspace/db/schema";
+import { accountsTable, settingsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
+import { prerenderMiddleware } from "./middleware/prerender";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -270,71 +271,84 @@ app.get("/sitemap.xml", async (req, res) => {
       process.env.SITE_URL?.replace(/\/$/, "") ||
       `${req.protocol}://${req.headers.host}`;
 
-    // Fetch all active accounts for individual product pages
+    // Fetch all active, public, non-deleted accounts that have slugs
     const activeAccounts = await db
-      .select({ id: accountsTable.id, updatedAt: accountsTable.updatedAt, slug: accountsTable.slug })
+      .select({
+        id: accountsTable.id,
+        slug: accountsTable.slug,
+        updatedAt: accountsTable.updatedAt,
+        imageUrls: accountsTable.imageUrls,
+      })
       .from(accountsTable)
       .where(eq(accountsTable.status, "active"));
 
     // ── Static public pages ──────────────────────────────────────────────────
-    // Only pages that are:
-    //   • Publicly accessible without login
-    //   • Have real SEO value (exclude /login, /chat sessions, seller portal, admin)
     const staticUrls: Array<{ loc: string; changefreq: string; priority: string; lastmod?: string }> = [
-      // Homepage — highest priority, changes daily as inventory updates
-      { loc: `${origin}/`,       changefreq: "daily",   priority: "1.0" },
-      // Accounts hub — crawl discovery page, links to all listings
-      { loc: `${origin}/accounts`, changefreq: "daily", priority: "0.9" },
-      // FAQ — helpful long-tail content, updated occasionally
-      { loc: `${origin}/faq`,    changefreq: "weekly",  priority: "0.7" },
-      // Signup — brings new customers, indexed for brand searches
-      { loc: `${origin}/signup`, changefreq: "monthly", priority: "0.5" },
+      { loc: `${origin}/`,        changefreq: "daily",   priority: "1.0" },
+      { loc: `${origin}/accounts`, changefreq: "daily",  priority: "0.9" },
+      { loc: `${origin}/faq`,     changefreq: "weekly",  priority: "0.7" },
+      { loc: `${origin}/signup`,  changefreq: "monthly", priority: "0.5" },
     ];
 
-    // ── Dynamic account pages (product pages — highest SEO value) ───────────
-    // Each active account listing is a unique product page Google should index.
-    // Skip accounts that have no slug — numeric URLs are not for public indexing.
-    const accountUrls = activeAccounts
+    // ── Dynamic account pages ────────────────────────────────────────────────
+    // Include image data so Google Image Search can discover account screenshots.
+    // Only include accounts with slugs — numeric URLs canonicalise to slugs.
+    const accountUrlEntries = activeAccounts
       .filter((a) => !!a.slug)
-      .map((a) => ({
-        loc: `${origin}/account/${a.slug}`,
-        lastmod: a.updatedAt
+      .map((a) => {
+        const lastmod = a.updatedAt
           ? new Date(a.updatedAt).toISOString().split("T")[0]
-          : new Date().toISOString().split("T")[0],
-        changefreq: "weekly",
-        priority: "0.9",
-      }));
+          : new Date().toISOString().split("T")[0];
 
-    // Accounts first (most valuable for SEO), then static pages
-    const allUrls = [...accountUrls, ...staticUrls];
+        const imageLines = (a.imageUrls ?? [])
+          .slice(0, 3) // max 3 images per URL entry
+          .map((imgPath) =>
+            `    <image:image><image:loc>${origin}/api/storage${imgPath}</image:loc></image:image>`,
+          )
+          .join("\n");
 
-    const urlEntries = allUrls
-      .map((u) =>
-        [
+        return [
           "  <url>",
-          `    <loc>${u.loc}</loc>`,
-          u.lastmod ? `    <lastmod>${u.lastmod}</lastmod>` : null,
-          `    <changefreq>${u.changefreq}</changefreq>`,
-          `    <priority>${u.priority}</priority>`,
+          `    <loc>${origin}/account/${a.slug}</loc>`,
+          `    <lastmod>${lastmod}</lastmod>`,
+          `    <changefreq>weekly</changefreq>`,
+          `    <priority>0.9</priority>`,
+          imageLines || null,
           "  </url>",
         ]
           .filter(Boolean)
-          .join("\n"),
-      )
-      .join("\n");
+          .join("\n");
+      });
+
+    const staticUrlEntries = staticUrls.map((u) =>
+      [
+        "  <url>",
+        `    <loc>${u.loc}</loc>`,
+        u.lastmod ? `    <lastmod>${u.lastmod}</lastmod>` : null,
+        `    <changefreq>${u.changefreq}</changefreq>`,
+        `    <priority>${u.priority}</priority>`,
+        "  </url>",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+
+    // Account pages first (highest SEO value), then static pages
+    const allEntries = [...accountUrlEntries, ...staticUrlEntries];
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset
   xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
     http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
-${urlEntries}
+${allEntries.join("\n")}
 </urlset>`;
 
     res.setHeader("Content-Type", "application/xml; charset=utf-8");
-    res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
-    res.setHeader("X-Robots-Tag", "noindex"); // Don't index the sitemap itself
+    // 15-minute cache — fresh enough to pick up new listings quickly
+    res.setHeader("Cache-Control", "public, max-age=900, stale-while-revalidate=3600");
     res.send(xml);
   } catch (err) {
     req.log.error({ err }, "sitemap generation failed");
@@ -343,6 +357,15 @@ ${urlEntries}
       .send(`<?xml version="1.0"?><error>Sitemap temporarily unavailable</error>`);
   }
 });
+
+// ─── Dynamic rendering for search-engine crawlers ────────────────────────────
+//
+// Must come BEFORE static file serving so bots get server-rendered HTML
+// instead of the empty React shell (index.html).
+// Normal browser requests are not affected — this only fires for known crawler
+// User-Agents (Googlebot, Bingbot, etc.).
+
+app.use(prerenderMiddleware);
 
 // ─── Serve built frontend in production (same-origin mode) ───────────────────
 
