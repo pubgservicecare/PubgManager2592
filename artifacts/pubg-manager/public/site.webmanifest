@@ -1,0 +1,23 @@
+{
+  "name": "CodexStocks — PUBG Mobile Account Marketplace",
+  "short_name": "CodexStocks",
+  "description": "Pakistan's most trusted marketplace for buying and selling verified PUBG Mobile accounts.",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#0a0a0a",
+  "theme_color": "#FFAA00",
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
