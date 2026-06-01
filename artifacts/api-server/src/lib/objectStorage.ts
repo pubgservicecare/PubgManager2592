@@ -154,6 +154,41 @@ export class ObjectStorageService {
     }
   }
 
+  /**
+   * Configures CORS on the GCS bucket so browsers can PUT files directly
+   * using presigned upload URLs. Without this, uploads fail with "Failed to fetch".
+   */
+  async configureBucketCors(): Promise<{ ok: boolean; error?: string }> {
+    try {
+      const settings = await getStorageSettings();
+      const keyJson = buildGcsKeyJson(settings ?? {});
+      if (!keyJson) return { ok: false, error: "GCS credentials not configured" };
+
+      const client = buildStorageClient(keyJson);
+      const bucketName = settings?.gcsBucketName || "";
+      if (!bucketName) return { ok: false, error: "Bucket name not configured" };
+
+      const bucket = client.bucket(bucketName);
+      await bucket.setCorsConfiguration([
+        {
+          origin: ["*"],
+          method: ["GET", "PUT", "HEAD", "OPTIONS", "POST", "DELETE"],
+          responseHeader: [
+            "Content-Type",
+            "Content-MD5",
+            "Authorization",
+            "x-goog-resumable",
+            "x-goog-meta-*",
+          ],
+          maxAgeSeconds: 3600,
+        },
+      ]);
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, error: err?.message || "Failed to configure CORS" };
+    }
+  }
+
   async searchPublicObject(filePath: string): Promise<File | null> {
     const client = await this.getStorageClient();
     for (const searchPath of await this.getPublicObjectSearchPaths()) {

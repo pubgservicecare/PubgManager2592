@@ -90,6 +90,9 @@ router.post("/storage/test-connection", async (req: Request, res: Response) => {
     }
     const result = await objectStorageService.testGcsConnection();
     if (result.ok) {
+      // Also configure CORS automatically on successful connection test
+      // so browsers can PUT files directly via presigned URLs.
+      await objectStorageService.configureBucketCors().catch(() => {});
       res.json({ ok: true, message: "Google Cloud Storage connection successful." });
     } else {
       res.status(400).json({ ok: false, error: result.error || "Connection failed" });
@@ -97,6 +100,29 @@ router.post("/storage/test-connection", async (req: Request, res: Response) => {
   } catch (error: any) {
     req.log.error({ err: error }, "Error testing storage connection");
     res.status(500).json({ ok: false, error: error?.message || "Connection test failed" });
+  }
+});
+
+/**
+ * POST /storage/configure-cors
+ * Configures CORS on the GCS bucket to allow browser-to-GCS direct uploads.
+ */
+router.post("/storage/configure-cors", async (req: Request, res: Response) => {
+  try {
+    const isLocal = await objectStorageService.isLocalStorage();
+    if (isLocal) {
+      res.json({ ok: true, message: "Local storage does not need CORS configuration." });
+      return;
+    }
+    const result = await objectStorageService.configureBucketCors();
+    if (result.ok) {
+      res.json({ ok: true, message: "CORS configured successfully. Image uploads should now work." });
+    } else {
+      res.status(400).json({ ok: false, error: result.error || "Failed to configure CORS" });
+    }
+  } catch (error: any) {
+    req.log.error({ err: error }, "Error configuring CORS");
+    res.status(500).json({ ok: false, error: error?.message || "CORS configuration failed" });
   }
 });
 

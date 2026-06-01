@@ -241,6 +241,24 @@ export function AdminSettings() {
     }
   };
 
+  const [configuringCors, setConfiguringCors] = React.useState(false);
+  const handleConfigureCors = async () => {
+    setConfiguringCors(true);
+    try {
+      const res = await fetch(apiUrl("/api/storage/configure-cors"), { method: "POST" });
+      const data = await res.json();
+      if (data.ok) {
+        toast({ title: "CORS Fixed", description: "Image uploads should now work correctly.", variant: "default" });
+      } else {
+        toast({ title: "CORS Fix Failed", description: data.error || "Could not configure CORS.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "CORS Fix Failed", description: "Network error. Please check server is running.", variant: "destructive" });
+    } finally {
+      setConfiguringCors(false);
+    }
+  };
+
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
@@ -701,6 +719,18 @@ export function AdminSettings() {
                         <><Loader2 className="w-4 h-4 animate-spin" /> Testing...</>
                       ) : (
                         <><Wifi className="w-4 h-4" /> Test Connection</>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfigureCors}
+                      disabled={configuringCors}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-amber-500/50 text-amber-400 hover:bg-amber-500/10 font-bold text-sm transition-all disabled:opacity-50"
+                    >
+                      {configuringCors ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Fixing...</>
+                      ) : (
+                        <><ShieldCheck className="w-4 h-4" /> Fix CORS</>
                       )}
                     </button>
                     <button
