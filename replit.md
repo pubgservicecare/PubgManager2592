@@ -9,19 +9,15 @@ Pakistan's trusted marketplace for buying and selling premium PUBG Mobile accoun
 pnpm install
 ```
 
-### Step 2 — Start the app (in order)
-Restart these two workflows **in this order**, one at a time:
-1. **"API Server"** — wait for it to say `Server listening` before continuing
-2. **"Start application"** — wait for port 5000 to open
-
-Each workflow already includes `fuser -k` to kill stale ports before starting, so port conflicts are handled automatically.
+### Step 2 — Start the app (restart in this order if needed)
+1. **`artifacts/api-server: API Server`** — API on port 8080, wait for `Server listening`
+2. **`Start application`** — frontend dev server on port 5000
 
 ### Step 3 — Artifact preview (canvas)
-If the `artifacts/pubg-manager: web` workflow is not running, restart it too. It provides the canvas/artifact iframe preview on port 21604.
+`artifacts/pubg-manager: web` runs the frontend on port 21604 for canvas/iframe preview.
 
-### Do NOT touch these — they are expected to fail
-- `artifacts/api-server: API Server` — fails by design (port 8080 already taken by "API Server")
-- `.migration-backup/*` workflows — legacy, always fail, ignore them
+### Workflows that are expected to fail — ignore
+- `.migration-backup/*` workflows — legacy backup, always fail, ignore them
 
 ### Admin login
 - URL: `/admin`
@@ -41,7 +37,8 @@ If the `artifacts/pubg-manager: web` workflow is not running, restart it too. It
 
 ## Required Environment Variables
 
-- `DATABASE_URL` — PostgreSQL connection string (auto-provisioned by Replit)
+- `NEON_DATABASE_URL` — Neon PostgreSQL connection string (**primary DB** — set in Replit secrets, takes priority over DATABASE_URL)
+- `DATABASE_URL` — Replit-managed PostgreSQL fallback (auto-provisioned, used only if NEON_DATABASE_URL is not set)
 - `SESSION_SECRET` — Random secret for session signing (set in Replit secrets)
 - `FRONTEND_URL` — Frontend origin(s) for CORS (comma-separated, optional in dev)
 - `PORT` — Set by workflow; API server defaults to 8080 if not set
