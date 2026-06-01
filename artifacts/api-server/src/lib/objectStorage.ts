@@ -224,23 +224,34 @@ export class ObjectStorageService {
   }
 
   /**
-   * Generates a presigned upload URL for a new object.
+   * Generates an upload URL for a new object.
    *
-   * For GCS: the signed URL is temporary (15 min TTL) and used only for
-   * the browser-to-GCS PUT request. The permanent path stored in the DB
-   * is returned separately via normalizeObjectEntityPath().
+   * For local storage: returns a direct local upload URL.
+   * For GCS: returns a PROXY upload URL (browser → our API → GCS).
    *
-   * Bug A fix: removed the leading slash that caused an empty bucket name
-   * when folderPath was empty. Path is now constructed without a leading
-   * slash and parsed correctly in all cases.
+   * Proxy approach avoids signed URL signing issues and GCS CORS entirely.
+   * The UUID is stored temporarily in-memory and resolved to a GCS path
+   * when the proxy endpoint receives the file.
    */
   async getObjectEntityUploadURL(baseUrl: string): Promise<string> {
     const isLocal = await this.isLocalStorage();
+    const objectId = randomUUID();
     if (isLocal) {
-      const objectId = randomUUID();
       return `${baseUrl}/api/storage/uploads/local/${objectId}`;
     }
+    // GCS: use proxy endpoint — browser PUTs to our server, server uploads to GCS
+    return `${baseUrl}/api/storage/uploads/gcs/${objectId}`;
+  }
 
+  /**
+   * Saves a file buffer to GCS. Called by the proxy upload endpoint.
+   * Returns the permanent bucket-relative object path.
+   */
+  async saveGcsObject(
+    objectId: string,
+    data: Buffer,
+    contentType: string,
+  ): Promise<string> {
     const client = await this.getStorageClient();
     const settings = await getStorageSettings();
     const folderPath =
@@ -248,21 +259,14 @@ export class ObjectStorageService {
     const bucketName = settings?.gcsBucketName || "";
     if (!bucketName) throw new GcsNotConfiguredError();
 
-    const objectId = randomUUID();
-
-    // Build the bucket-relative object name — no leading slash, no doubles.
-    // folderPath is optional; when absent the object goes to uploads/ directly.
     const objectName = folderPath
       ? `${folderPath}/uploads/${objectId}`
       : `uploads/${objectId}`;
 
-    return signObjectURL({
-      client,
-      bucketName,
-      objectName,
-      method: "PUT",
-      ttlSec: 900,
-    });
+    const bucket = client.bucket(bucketName);
+    const file = bucket.file(objectName);
+    await file.save(data, { contentType, resumable: false });
+    return `/objects/${objectName}`;
   }
 
   /**
@@ -287,24 +291,33 @@ export class ObjectStorageService {
       return `/objects/local/${uuid}`;
     }
 
+    // GCS proxy upload URL → compute the deterministic permanent path from the UUID.
+    // Both request-url and the proxy PUT endpoint use the same formula so they agree.
+    if (rawPath.includes("/api/storage/uploads/gcs/")) {
+      const uuid = rawPath.split("/api/storage/uploads/gcs/").pop()!.split("?")[0];
+      const settings = await getStorageSettings();
+      const folderPath =
+        settings?.gcsFolderPath || settings?.gcsBucketPrivatePath || "";
+      const objectName = folderPath
+        ? `${folderPath}/uploads/${uuid}`
+        : `uploads/${uuid}`;
+      return `/objects/${objectName}`;
+    }
+
     // Already normalized to a permanent /objects/... path
     if (rawPath.startsWith("/objects/")) return rawPath;
 
-    // GCS signed URL → extract permanent bucket-relative path.
-    // Signed URL pathname: /bucketName/path/to/object
-    // We want:             /objects/path/to/object
+    // GCS signed URL (legacy) → extract permanent bucket-relative path.
     if (rawPath.startsWith("https://storage.googleapis.com/")) {
       try {
         const url = new URL(rawPath);
-        // pathname starts with /bucketName/...
         const pathParts = url.pathname.split("/").filter(Boolean);
-        // pathParts[0] = bucketName, pathParts[1..] = object path segments
         if (pathParts.length >= 2) {
           const bucketRelativePath = pathParts.slice(1).join("/");
           return `/objects/${bucketRelativePath}`;
         }
       } catch {
-        // malformed URL — fall through and return as-is
+        // malformed URL — fall through
       }
     }
 

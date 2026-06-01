@@ -53,6 +53,33 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
 });
 
 /**
+ * PUT /storage/uploads/gcs/:uuid
+ *
+ * Proxy upload for GCS: browser sends the raw file here, we upload to GCS
+ * server-side using the storage client (no signed URLs, no CORS issues).
+ */
+router.put("/storage/uploads/gcs/:uuid", express_raw_middleware, async (req: Request, res: Response) => {
+  try {
+    const uuid = req.params.uuid as string;
+    if (!uuid || !/^[0-9a-f-]{36}$/i.test(uuid)) {
+      res.status(400).json({ error: "Invalid upload token" });
+      return;
+    }
+    const contentType = (req.headers["content-type"] as string) || "application/octet-stream";
+    const data = req.body as Buffer;
+    if (!Buffer.isBuffer(data) || data.length === 0) {
+      res.status(400).json({ error: "No file data received" });
+      return;
+    }
+    const objectPath = await objectStorageService.saveGcsObject(uuid, data, contentType);
+    res.status(200).json({ ok: true, objectPath });
+  } catch (error) {
+    req.log.error({ err: error }, "Error in GCS proxy upload");
+    res.status(500).json({ error: "Failed to upload file to GCS" });
+  }
+});
+
+/**
  * PUT /storage/uploads/local/:uuid
  *
  * Accept raw file body for local storage mode.
