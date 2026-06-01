@@ -92,5 +92,7 @@ channel = "stable-25_05"
 [userenv.shared]
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"
+SAME_ORIGIN_DEPLOYMENT = "true"
+NODE_ENV = "development"
 
 [userenv.development]
