@@ -22,25 +22,30 @@ export class ObjectNotFoundError extends Error {
 
 export class GcsNotConfiguredError extends Error {
   constructor() {
-    super("Google Cloud Storage is not configured. Go to Admin → Settings → File Storage to set it up.");
+    super(
+      "Google Cloud Storage is not configured. Go to Admin → Settings → File Storage to set it up.",
+    );
     this.name = "GcsNotConfiguredError";
     Object.setPrototypeOf(this, GcsNotConfiguredError.prototype);
   }
 }
 
 async function getStorageSettings() {
-  const [settings] = await db.select({
-    storageProvider: settingsTable.storageProvider,
-    gcsKeyJson: settingsTable.gcsKeyJson,
-    gcsBucketPublicPath: settingsTable.gcsBucketPublicPath,
-    gcsBucketPrivatePath: settingsTable.gcsBucketPrivatePath,
-    gcsBucketName: settingsTable.gcsBucketName,
-    gcsProjectId: settingsTable.gcsProjectId,
-    gcsServiceAccountEmail: settingsTable.gcsServiceAccountEmail,
-    gcsPrivateKey: settingsTable.gcsPrivateKey,
-    gcsPublicBaseUrl: settingsTable.gcsPublicBaseUrl,
-    gcsFolderPath: settingsTable.gcsFolderPath,
-  }).from(settingsTable).limit(1);
+  const [settings] = await db
+    .select({
+      storageProvider: settingsTable.storageProvider,
+      gcsKeyJson: settingsTable.gcsKeyJson,
+      gcsBucketPublicPath: settingsTable.gcsBucketPublicPath,
+      gcsBucketPrivatePath: settingsTable.gcsBucketPrivatePath,
+      gcsBucketName: settingsTable.gcsBucketName,
+      gcsProjectId: settingsTable.gcsProjectId,
+      gcsServiceAccountEmail: settingsTable.gcsServiceAccountEmail,
+      gcsPrivateKey: settingsTable.gcsPrivateKey,
+      gcsPublicBaseUrl: settingsTable.gcsPublicBaseUrl,
+      gcsFolderPath: settingsTable.gcsFolderPath,
+    })
+    .from(settingsTable)
+    .limit(1);
   return settings ?? null;
 }
 
@@ -51,7 +56,11 @@ function buildGcsKeyJson(settings: {
   gcsPrivateKey?: string | null;
 }): string | null {
   if (settings.gcsKeyJson) return settings.gcsKeyJson;
-  if (settings.gcsProjectId && settings.gcsServiceAccountEmail && settings.gcsPrivateKey) {
+  if (
+    settings.gcsProjectId &&
+    settings.gcsServiceAccountEmail &&
+    settings.gcsPrivateKey
+  ) {
     return JSON.stringify({
       type: "service_account",
       project_id: settings.gcsProjectId,
@@ -68,7 +77,8 @@ function buildStorageClient(keyJson: string): Storage {
 }
 
 function getLocalUploadDir(): string {
-  const dir = process.env.LOCAL_UPLOAD_DIR || path.join(process.cwd(), "uploads");
+  const dir =
+    process.env.LOCAL_UPLOAD_DIR || path.join(process.cwd(), "uploads");
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -89,24 +99,32 @@ export class ObjectStorageService {
 
   async getPublicObjectSearchPaths(): Promise<Array<string>> {
     const settings = await getStorageSettings();
-    const pathsStr = settings?.gcsBucketPublicPath || process.env.PUBLIC_OBJECT_SEARCH_PATHS || "";
+    const pathsStr =
+      settings?.gcsBucketPublicPath ||
+      process.env.PUBLIC_OBJECT_SEARCH_PATHS ||
+      "";
     const paths = Array.from(
       new Set(
         pathsStr
           .split(",")
           .map((item: string) => item.trim())
-          .filter((item: string) => item.length > 0)
-      )
+          .filter((item: string) => item.length > 0),
+      ),
     ) as string[];
     if (paths.length === 0) throw new GcsNotConfiguredError();
     return paths;
   }
 
+  /**
+   * Returns the optional folder path prefix within the bucket.
+   * Empty string when not configured — folder path is not required.
+   * Never throws; callers that need it should validate themselves.
+   */
   async getPrivateObjectDir(): Promise<string> {
     const settings = await getStorageSettings();
-    const dir = settings?.gcsBucketPrivatePath || settings?.gcsFolderPath || process.env.PRIVATE_OBJECT_DIR || "";
-    if (!dir) throw new GcsNotConfiguredError();
-    return dir;
+    return (
+      settings?.gcsBucketPrivatePath || settings?.gcsFolderPath || ""
+    );
   }
 
   async getStorageClient(): Promise<Storage> {
@@ -149,7 +167,10 @@ export class ObjectStorageService {
     return null;
   }
 
-  async downloadObject(file: File, cacheTtlSec: number = 3600): Promise<Response> {
+  async downloadObject(
+    file: File,
+    cacheTtlSec: number = 3600,
+  ): Promise<Response> {
     const [metadata] = await file.getMetadata();
     const aclPolicy = await getObjectAclPolicy(file);
     const isPublic = aclPolicy?.visibility === "public";
@@ -158,7 +179,8 @@ export class ObjectStorageService {
     const webStream = Readable.toWeb(nodeStream) as ReadableStream;
 
     const headers: Record<string, string> = {
-      "Content-Type": (metadata.contentType as string) || "application/octet-stream",
+      "Content-Type":
+        (metadata.contentType as string) || "application/octet-stream",
       "Cache-Control": `${isPublic ? "public" : "private"}, max-age=${cacheTtlSec}`,
     };
     if (metadata.size) headers["Content-Length"] = String(metadata.size);
@@ -166,6 +188,17 @@ export class ObjectStorageService {
     return new Response(webStream, { headers });
   }
 
+  /**
+   * Generates a presigned upload URL for a new object.
+   *
+   * For GCS: the signed URL is temporary (15 min TTL) and used only for
+   * the browser-to-GCS PUT request. The permanent path stored in the DB
+   * is returned separately via normalizeObjectEntityPath().
+   *
+   * Bug A fix: removed the leading slash that caused an empty bucket name
+   * when folderPath was empty. Path is now constructed without a leading
+   * slash and parsed correctly in all cases.
+   */
   async getObjectEntityUploadURL(baseUrl: string): Promise<string> {
     const isLocal = await this.isLocalStorage();
     if (isLocal) {
@@ -175,60 +208,112 @@ export class ObjectStorageService {
 
     const client = await this.getStorageClient();
     const settings = await getStorageSettings();
-    const folderPath = settings?.gcsFolderPath || settings?.gcsBucketPrivatePath || "";
+    const folderPath =
+      settings?.gcsFolderPath || settings?.gcsBucketPrivatePath || "";
     const bucketName = settings?.gcsBucketName || "";
-    const objectId = randomUUID();
-    const fullPath = folderPath
-      ? `${bucketName}/${folderPath}/uploads/${objectId}`
-      : `/${bucketName}/uploads/${objectId}`;
-    const { bucketName: bn, objectName } = parseObjectPath(`/${fullPath}`);
+    if (!bucketName) throw new GcsNotConfiguredError();
 
-    return signObjectURL({ client, bucketName: bn, objectName, method: "PUT", ttlSec: 900 });
+    const objectId = randomUUID();
+
+    // Build the bucket-relative object name — no leading slash, no doubles.
+    // folderPath is optional; when absent the object goes to uploads/ directly.
+    const objectName = folderPath
+      ? `${folderPath}/uploads/${objectId}`
+      : `uploads/${objectId}`;
+
+    return signObjectURL({
+      client,
+      bucketName,
+      objectName,
+      method: "PUT",
+      ttlSec: 900,
+    });
   }
 
+  /**
+   * Converts a raw upload URL/path into a permanent, stable object path
+   * suitable for storage in the database.
+   *
+   * Bug B fix: previously, when the folder path was empty, getPrivateObjectDir()
+   * threw GcsNotConfiguredError and the full signed URL was stored in the DB.
+   * Signed URLs expire after ~15 min, breaking image retrieval.
+   *
+   * Now we parse the permanent path directly from the GCS signed URL's pathname,
+   * stripping the leading /bucketName segment to get the bucket-relative path.
+   * The result is always a stable /objects/... path — never a signed URL.
+   *
+   * Stored format:  /objects/uploads/{uuid}
+   *              or /objects/{folder}/uploads/{uuid}
+   */
   async normalizeObjectEntityPath(rawPath: string): Promise<string> {
+    // Local storage: extract UUID from local upload URL
     if (rawPath.includes("/api/storage/uploads/local/")) {
       const uuid = rawPath.split("/api/storage/uploads/local/").pop()!;
       return `/objects/local/${uuid}`;
     }
-    if (!rawPath.startsWith("https://storage.googleapis.com/")) return rawPath;
 
-    const privateObjectDir = await this.getPrivateObjectDir().catch(() => "");
-    if (!privateObjectDir) return rawPath;
+    // Already normalized to a permanent /objects/... path
+    if (rawPath.startsWith("/objects/")) return rawPath;
 
-    const url = new URL(rawPath);
-    const rawObjectPath = url.pathname;
+    // GCS signed URL → extract permanent bucket-relative path.
+    // Signed URL pathname: /bucketName/path/to/object
+    // We want:             /objects/path/to/object
+    if (rawPath.startsWith("https://storage.googleapis.com/")) {
+      try {
+        const url = new URL(rawPath);
+        // pathname starts with /bucketName/...
+        const pathParts = url.pathname.split("/").filter(Boolean);
+        // pathParts[0] = bucketName, pathParts[1..] = object path segments
+        if (pathParts.length >= 2) {
+          const bucketRelativePath = pathParts.slice(1).join("/");
+          return `/objects/${bucketRelativePath}`;
+        }
+      } catch {
+        // malformed URL — fall through and return as-is
+      }
+    }
 
-    let objectEntityDir = privateObjectDir;
-    if (!objectEntityDir.endsWith("/")) objectEntityDir = `${objectEntityDir}/`;
-
-    if (!rawObjectPath.startsWith(objectEntityDir)) return rawObjectPath;
-
-    const entityId = rawObjectPath.slice(objectEntityDir.length);
-    return `/objects/${entityId}`;
+    // Fallback: return unchanged
+    return rawPath;
   }
 
+  /**
+   * Resolves a stored /objects/... path to the actual GCS File object.
+   *
+   * Bug C fix: previously called getPrivateObjectDir() which threw when
+   * no folder path was configured, breaking retrieval for objects uploaded
+   * without a folder prefix.
+   *
+   * New approach: everything after /objects/ is the full bucket-relative
+   * path. We only need the bucket name to resolve it — the folder prefix
+   * is already embedded in the stored path when it was uploaded.
+   *
+   * Supports both:
+   *   /objects/uploads/{uuid}          → bucket: uploads/{uuid}
+   *   /objects/{folder}/uploads/{uuid} → bucket: {folder}/uploads/{uuid}
+   */
   async getObjectEntityFile(objectPath: string): Promise<File> {
     if (!objectPath.startsWith("/objects/")) throw new ObjectNotFoundError();
 
-    const parts = objectPath.slice(1).split("/");
-    if (parts.length < 2) throw new ObjectNotFoundError();
+    // Everything after the leading "/objects/" is the bucket-relative path
+    const bucketRelativePath = objectPath.slice("/objects/".length);
+    if (!bucketRelativePath) throw new ObjectNotFoundError();
 
     const client = await this.getStorageClient();
-    const entityId = parts.slice(1).join("/");
-    let entityDir = await this.getPrivateObjectDir();
-    if (!entityDir.endsWith("/")) entityDir = `${entityDir}/`;
+    const settings = await getStorageSettings();
+    const bucketName = settings?.gcsBucketName || "";
+    if (!bucketName) throw new GcsNotConfiguredError();
 
-    const objectEntityPath = `${entityDir}${entityId}`;
-    const { bucketName, objectName } = parseObjectPath(objectEntityPath);
     const bucket = client.bucket(bucketName);
-    const objectFile = bucket.file(objectName);
+    const objectFile = bucket.file(bucketRelativePath);
     const [exists] = await objectFile.exists();
     if (!exists) throw new ObjectNotFoundError();
     return objectFile;
   }
 
-  async serveLocalObject(objectPath: string): Promise<{ filePath: string; contentType: string } | null> {
+  async serveLocalObject(
+    objectPath: string,
+  ): Promise<{ filePath: string; contentType: string } | null> {
     if (!objectPath.startsWith("/objects/local/")) return null;
     const uuid = objectPath.replace("/objects/local/", "");
     const uploadDir = getLocalUploadDir();
@@ -238,19 +323,32 @@ export class ObjectStorageService {
     const filePath = path.join(uploadDir, match);
     const ext = path.extname(match).toLowerCase();
     const mimeMap: Record<string, string> = {
-      ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
-      ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml",
-      ".pdf": "application/pdf", ".mp4": "video/mp4",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".png": "image/png",
+      ".gif": "image/gif",
+      ".webp": "image/webp",
+      ".svg": "image/svg+xml",
+      ".pdf": "application/pdf",
+      ".mp4": "video/mp4",
     };
     const contentType = mimeMap[ext] || "application/octet-stream";
     return { filePath, contentType };
   }
 
-  async saveLocalObject(uuid: string, data: Buffer, contentType: string): Promise<void> {
+  async saveLocalObject(
+    uuid: string,
+    data: Buffer,
+    contentType: string,
+  ): Promise<void> {
     const uploadDir = getLocalUploadDir();
     const extMap: Record<string, string> = {
-      "image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif",
-      "image/webp": ".webp", "image/svg+xml": ".svg", "application/pdf": ".pdf",
+      "image/jpeg": ".jpg",
+      "image/png": ".png",
+      "image/gif": ".gif",
+      "image/webp": ".webp",
+      "image/svg+xml": ".svg",
+      "application/pdf": ".pdf",
       "video/mp4": ".mp4",
     };
     const ext = extMap[contentType] || "";
@@ -259,7 +357,10 @@ export class ObjectStorageService {
     fs.writeFileSync(filePath, data);
   }
 
-  async trySetObjectEntityAclPolicy(rawPath: string, aclPolicy: ObjectAclPolicy): Promise<string> {
+  async trySetObjectEntityAclPolicy(
+    rawPath: string,
+    aclPolicy: ObjectAclPolicy,
+  ): Promise<string> {
     const normalizedPath = await this.normalizeObjectEntityPath(rawPath);
     if (!normalizedPath.startsWith("/")) return normalizedPath;
     if (normalizedPath.startsWith("/objects/local/")) return normalizedPath;
@@ -286,17 +387,43 @@ export class ObjectStorageService {
   }
 }
 
-function parseObjectPath(path: string): { bucketName: string; objectName: string } {
-  if (path.startsWith("gs://")) {
-    path = path.slice(5);
-    const slashIdx = path.indexOf("/");
-    if (slashIdx === -1) return { bucketName: path, objectName: "" };
-    return { bucketName: path.slice(0, slashIdx), objectName: path.slice(slashIdx + 1) };
+/**
+ * Parses a GCS object path into { bucketName, objectName }.
+ *
+ * Accepted formats:
+ *   gs://bucket/path/to/object
+ *   /bucket/path/to/object
+ *   bucket/path/to/object   ← note: must have at least one slash after bucket
+ *
+ * No leading slash is prepended here — callers pass clean paths.
+ */
+function parseObjectPath(input: string): {
+  bucketName: string;
+  objectName: string;
+} {
+  if (input.startsWith("gs://")) {
+    const rest = input.slice(5);
+    const slashIdx = rest.indexOf("/");
+    if (slashIdx === -1) return { bucketName: rest, objectName: "" };
+    return {
+      bucketName: rest.slice(0, slashIdx),
+      objectName: rest.slice(slashIdx + 1),
+    };
   }
-  if (!path.startsWith("/")) path = `/${path}`;
-  const pathParts = path.split("/");
-  if (pathParts.length < 3) throw new Error("Invalid path: must contain at least a bucket name");
-  return { bucketName: pathParts[1], objectName: pathParts.slice(2).join("/") };
+
+  // Normalise: strip any leading slash so split("/") always gives
+  // ["bucket", "path", "to", "object"] with no empty first element.
+  const normalised = input.startsWith("/") ? input.slice(1) : input;
+  const parts = normalised.split("/");
+  if (parts.length < 2 || !parts[0]) {
+    throw new Error(
+      `Invalid GCS path "${input}": must contain at least a non-empty bucket name and one path segment.`,
+    );
+  }
+  return {
+    bucketName: parts[0],
+    objectName: parts.slice(1).join("/"),
+  };
 }
 
 async function signObjectURL({
@@ -315,7 +442,10 @@ async function signObjectURL({
   const bucket = client.bucket(bucketName);
   const file = bucket.file(objectName);
   const expires = Date.now() + ttlSec * 1000;
-  const [url] = await file.getSignedUrl({ action: method === "PUT" ? "write" : "read", expires });
+  const [url] = await file.getSignedUrl({
+    action: method === "PUT" ? "write" : "read",
+    expires,
+  });
   return url;
 }
 
