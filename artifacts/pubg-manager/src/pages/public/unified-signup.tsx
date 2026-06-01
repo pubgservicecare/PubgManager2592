@@ -40,6 +40,7 @@ export function SellerSignupPage() {
   const [, setLocation] = useLocation();
   const { customer, isLoading: customerLoading } = useCustomerAuth();
   const { seller, isLoading: sellerLoading } = useSellerAuth();
+  const [submitted, setSubmitted] = useState(false);
 
   useSEO({
     title: "Become a Seller",
@@ -47,8 +48,32 @@ export function SellerSignupPage() {
   });
 
   useEffect(() => {
-    if (!sellerLoading && seller) setLocation("/seller/dashboard");
-  }, [seller, sellerLoading, setLocation]);
+    if (!submitted && !sellerLoading && seller) setLocation("/seller/dashboard");
+  }, [seller, sellerLoading, setLocation, submitted]);
+
+  // Show success screen — locked here so auth changes don't interrupt it
+  if (submitted) {
+    return (
+      <PublicLayout>
+        <div className="flex-1 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-sm bg-card border border-border rounded-3xl p-8 text-center"
+          >
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/15 flex items-center justify-center">
+              <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+            </div>
+            <h1 className="text-xl font-display font-bold text-white mb-2">Application Submitted!</h1>
+            <p className="text-muted-foreground text-sm">
+              Our admin team will review your CNIC within 24 hours. You'll see seller features once approved.
+            </p>
+            <p className="text-xs text-muted-foreground mt-4">Redirecting to marketplace…</p>
+          </motion.div>
+        </div>
+      </PublicLayout>
+    );
+  }
 
   if (customerLoading || sellerLoading) {
     return (
@@ -65,6 +90,7 @@ export function SellerSignupPage() {
       <SellerSignupForm
         prefillName={customer.name}
         prefillPhone={(customer as any).phone || ""}
+        onSuccess={() => setSubmitted(true)}
       />
     );
   }
@@ -249,13 +275,12 @@ const STEPS = [
   { label: "Verify",  icon: IdCard },
 ];
 
-function SellerSignupForm({ prefillName, prefillPhone }: { prefillName: string; prefillPhone: string }) {
+function SellerSignupForm({ prefillName, prefillPhone, onSuccess }: { prefillName: string; prefillPhone: string; onSuccess: () => void }) {
   const [, setLocation] = useLocation();
   const { refresh: refreshSeller } = useSellerAuth();
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [success, setSuccess] = useState(false);
   const [dir, setDir] = useState(1); // 1 = forward, -1 = back
 
   const [form, setForm] = useState({
@@ -336,38 +361,14 @@ function SellerSignupForm({ prefillName, prefillPhone }: { prefillName: string; 
         const err = await res.json();
         throw new Error(err.error || "Signup failed");
       }
-      setSuccess(true);
-      await refreshSeller();
-      setTimeout(() => setLocation("/"), 3500);
+      onSuccess();
+      setTimeout(() => setLocation("/"), 3000);
     } catch (e: any) {
       setErrorMsg(e.message);
     } finally {
       setSubmitting(false);
     }
   };
-
-  if (success) {
-    return (
-      <PublicLayout>
-        <div className="flex-1 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-sm bg-card border border-border rounded-3xl p-8 text-center"
-          >
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/15 flex items-center justify-center">
-              <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-            </div>
-            <h1 className="text-xl font-display font-bold text-white mb-2">Application Submitted!</h1>
-            <p className="text-muted-foreground text-sm">
-              Our admin team will review your CNIC within 24 hours. You'll see seller features once approved.
-            </p>
-            <p className="text-xs text-muted-foreground mt-4">Redirecting…</p>
-          </motion.div>
-        </div>
-      </PublicLayout>
-    );
-  }
 
   return (
     <PublicLayout>
