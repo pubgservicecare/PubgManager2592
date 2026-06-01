@@ -36,3 +36,31 @@ export const pool = new Pool({
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";
+
+/**
+ * Tests an arbitrary PostgreSQL connection string without affecting the
+ * live pool. Used by the admin settings "Test Neon Connection" endpoint.
+ * SSL is always enabled (required by Neon and harmless elsewhere).
+ */
+export async function testDatabaseUrl(url: string): Promise<{ ok: boolean; error?: string }> {
+  const testPool = new Pool({
+    connectionString: url,
+    ssl: { rejectUnauthorized: false },
+    max: 1,
+    connectionTimeoutMillis: 8000,
+    idleTimeoutMillis: 1000,
+  });
+  try {
+    const client = await testPool.connect();
+    try {
+      await client.query("SELECT 1");
+      return { ok: true };
+    } finally {
+      client.release();
+    }
+  } catch (err: any) {
+    return { ok: false, error: err?.message || "Connection failed." };
+  } finally {
+    await testPool.end().catch(() => {});
+  }
+}

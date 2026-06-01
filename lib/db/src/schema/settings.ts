@@ -49,6 +49,8 @@ export const settingsTable = pgTable("settings", {
   gcsKeyJson: text("gcs_key_json"),
   gcsBucketPublicPath: text("gcs_bucket_public_path"),
   gcsBucketPrivatePath: text("gcs_bucket_private_path"),
+  // External database (Neon)
+  neonDatabaseUrl: text("neon_database_url"),
 });
 
 export const insertSettingsSchema = createInsertSchema(settingsTable).omit({ id: true });

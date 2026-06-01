@@ -32,6 +32,10 @@ import {
   HardDrive,
   Wifi,
   FolderOpen,
+  Database,
+  ExternalLink,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { FileUploadField } from "@/components/FileUploadField";
@@ -66,6 +70,8 @@ type FormState = {
   gcsBucketName: string | null;
   gcsKeyJson: string | null;
   gcsFolderPath: string | null;
+  // Database
+  neonDatabaseUrl: string | null;
 };
 
 const TABS = [
@@ -79,6 +85,7 @@ const TABS = [
   { id: "maintenance", label: "Site Status", icon: Power },
   { id: "security", label: "Security", icon: ShieldCheck },
   { id: "storage", label: "File Storage", icon: Cloud },
+  { id: "database", label: "Database", icon: Database },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -91,6 +98,9 @@ export function AdminSettings() {
   const [showJsonKey, setShowJsonKey] = useState(false);
   const [showCompleteNote, setShowCompleteNote] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
+  const [testingNeonConnection, setTestingNeonConnection] = useState(false);
+  const [showNeonUrl, setShowNeonUrl] = useState(false);
+  const [copiedNeonUrl, setCopiedNeonUrl] = useState(false);
 
   const [form, setForm] = useState<FormState>({
     siteName: "",
@@ -121,6 +131,7 @@ export function AdminSettings() {
     gcsBucketName: "",
     gcsKeyJson: "",
     gcsFolderPath: "",
+    neonDatabaseUrl: "",
   });
 
   useEffect(() => {
@@ -155,6 +166,7 @@ export function AdminSettings() {
         gcsBucketName: s.gcsBucketName ?? "",
         gcsKeyJson: s.gcsKeyJson ?? "",
         gcsFolderPath: s.gcsFolderPath ?? "",
+        neonDatabaseUrl: s.neonDatabaseUrl ?? "",
       });
     }
   }, [settings]);
@@ -176,6 +188,40 @@ export function AdminSettings() {
     const payload: any = { ...form };
     if (!payload.adminPassword) delete payload.adminPassword;
     updateMut.mutate({ data: payload });
+  };
+
+  const handleTestNeonConnection = async () => {
+    const url = form.neonDatabaseUrl?.trim();
+    if (!url) {
+      toast({ title: "No URL entered", description: "Paste your Neon connection string first.", variant: "destructive" });
+      return;
+    }
+    setTestingNeonConnection(true);
+    try {
+      const res = await fetch(apiUrl("/api/settings/test-neon-connection"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast({ title: "Connection Successful", description: data.message || "Neon database is reachable.", variant: "default" });
+      } else {
+        toast({ title: "Connection Failed", description: data.error || "Could not connect to Neon.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Connection Failed", description: "Network error. Please check server is running.", variant: "destructive" });
+    } finally {
+      setTestingNeonConnection(false);
+    }
+  };
+
+  const handleCopyNeonUrl = async () => {
+    const url = form.neonDatabaseUrl?.trim();
+    if (!url) return;
+    await navigator.clipboard.writeText(url).catch(() => {});
+    setCopiedNeonUrl(true);
+    setTimeout(() => setCopiedNeonUrl(false), 2000);
   };
 
   const handleTestConnection = async () => {
@@ -667,6 +713,150 @@ export function AdminSettings() {
                   </div>
                 </div>
               </>
+            )}
+
+            {activeTab === "database" && (
+              <Section
+                title="Neon Database"
+                subtitle="Connect an external PostgreSQL database hosted on Neon instead of Replit's built-in database."
+                icon={<Database className="w-5 h-5" />}
+              >
+                {/* Info banner */}
+                <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 flex items-start gap-3">
+                  <Database className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                  <div className="text-sm space-y-1.5">
+                    <p className="font-bold text-white">Why use Neon?</p>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Replit's built-in database is tied to this Repl — it gets wiped if the Repl is deleted or migrated.
+                      Neon gives you a permanent, independent PostgreSQL database that survives Repl changes, supports larger data,
+                      and lets you query it from any server.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Connection string field */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-muted-foreground uppercase block">
+                      Neon Connection String
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {form.neonDatabaseUrl && (
+                        <button
+                          type="button"
+                          onClick={handleCopyNeonUrl}
+                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-white transition-colors"
+                        >
+                          {copiedNeonUrl ? (
+                            <><Check className="w-3.5 h-3.5 text-emerald-400" /> Copied</>
+                          ) : (
+                            <><Copy className="w-3.5 h-3.5" /> Copy</>
+                          )}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowNeonUrl((v) => !v)}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-white transition-colors"
+                      >
+                        {showNeonUrl ? <><EyeOff className="w-3.5 h-3.5" /> Hide</> : <><Eye className="w-3.5 h-3.5" /> Show</>}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      type={showNeonUrl ? "text" : "password"}
+                      value={form.neonDatabaseUrl ?? ""}
+                      placeholder="postgresql://user:password@ep-xxx.neon.tech/dbname?sslmode=require"
+                      onChange={(e) => set("neonDatabaseUrl", e.target.value)}
+                      className="w-full bg-background border border-border focus:border-primary rounded-xl pl-10 pr-4 py-3 text-white outline-none font-mono text-sm"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Get this from your{" "}
+                    <a
+                      href="https://console.neon.tech"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline inline-flex items-center gap-0.5"
+                    >
+                      Neon Console <ExternalLink className="w-3 h-3" />
+                    </a>
+                    {" "}→ your project → Connection Details → copy the <code className="bg-secondary px-1 rounded">postgresql://</code> URL.
+                  </p>
+                  {form.neonDatabaseUrl && (
+                    <div className="flex items-center gap-2 text-xs text-emerald-400">
+                      <CheckCircle2 className="w-3 h-3" /> Connection string is saved
+                    </div>
+                  )}
+                </div>
+
+                {/* How to activate */}
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-3">
+                  <p className="text-sm font-bold text-amber-300 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    After saving — 2 more steps to activate
+                  </p>
+                  <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
+                    <div className="flex gap-3">
+                      <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">1</span>
+                      <p>
+                        Go to your{" "}
+                        <a
+                          href="https://replit.com"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline inline-flex items-center gap-0.5"
+                        >
+                          Replit project <ExternalLink className="w-3 h-3" />
+                        </a>
+                        {" "}→ <strong className="text-white">Secrets</strong> (the 🔒 padlock icon) → Add a new secret named{" "}
+                        <code className="bg-secondary px-1.5 py-0.5 rounded text-white">NEON_DATABASE_URL</code> and paste your connection string as the value.
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">2</span>
+                      <p>
+                        Restart the <strong className="text-white">API Server</strong> workflow. The server will automatically use your Neon database instead of Replit's database from that point on.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Push schema note */}
+                <div className="bg-secondary/30 border border-border rounded-xl p-4 flex items-start gap-3">
+                  <BookOpen className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p className="font-bold text-white text-sm">First time using Neon? Push your schema</p>
+                    <p className="leading-relaxed">
+                      After setting <code className="bg-secondary px-1 rounded">NEON_DATABASE_URL</code> in Replit Secrets, run this command in the Shell to create all tables in your Neon database:
+                    </p>
+                    <code className="block bg-background border border-border rounded-lg px-3 py-2 text-emerald-300 mt-2 font-mono">
+                      pnpm --filter @workspace/db run push
+                    </code>
+                  </div>
+                </div>
+
+                {/* Test connection button */}
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleTestNeonConnection}
+                    disabled={testingNeonConnection || !form.neonDatabaseUrl?.trim()}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-primary/50 text-primary hover:bg-primary/10 font-bold text-sm transition-all disabled:opacity-50"
+                  >
+                    {testingNeonConnection ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Testing...</>
+                    ) : (
+                      <><Wifi className="w-4 h-4" /> Test Neon Connection</>
+                    )}
+                  </button>
+                  <p className="text-xs text-muted-foreground">
+                    Save settings first, then test to verify the URL is correct.
+                  </p>
+                </div>
+              </Section>
             )}
 
             {/* Save bar */}

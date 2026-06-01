@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, settingsTable } from "@workspace/db";
+import { db, settingsTable, testDatabaseUrl } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLog";
 import bcrypt from "bcryptjs";
@@ -34,6 +34,8 @@ const SETTING_FIELDS = [
   "gcsKeyJson",
   "gcsBucketPublicPath",
   "gcsBucketPrivatePath",
+  // External database
+  "neonDatabaseUrl",
   // New storage fields
   "storageProvider",
   "gcsBucketName",
@@ -127,6 +129,26 @@ router.patch("/settings", requireAdmin, async (req, res): Promise<void> => {
 
   const { adminPassword: _pw, ...safeSettings } = updated;
   res.json(safeSettings);
+});
+
+/**
+ * POST /settings/test-neon-connection
+ * Tests a Neon (or any PostgreSQL) connection string without
+ * affecting the current live database pool.
+ */
+router.post("/settings/test-neon-connection", requireAdmin, async (req, res): Promise<void> => {
+  const { url } = req.body ?? {};
+  if (!url || typeof url !== "string") {
+    res.status(400).json({ ok: false, error: "No database URL provided." });
+    return;
+  }
+
+  const result = await testDatabaseUrl(url);
+  if (result.ok) {
+    res.json({ ok: true, message: "Connection successful — Neon database is reachable." });
+  } else {
+    res.status(400).json({ ok: false, error: result.error || "Connection failed." });
+  }
 });
 
 export default router;
