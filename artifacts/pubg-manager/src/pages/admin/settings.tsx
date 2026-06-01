@@ -241,7 +241,7 @@ export function AdminSettings() {
     }
   };
 
-  const [configuringCors, setConfiguringCors] = React.useState(false);
+  const [configuringCors, setConfiguringCors] = useState(false);
   const handleConfigureCors = async () => {
     setConfiguringCors(true);
     try {
