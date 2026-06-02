@@ -104,7 +104,7 @@ export function useSEO({
         image: finalImage,
         url: finalCanonical,
         brand: {
-          "@type": "Organization",
+          "@type": "Brand",
           name: SITE_NAME,
         },
         offers: {

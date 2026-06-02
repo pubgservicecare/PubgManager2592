@@ -278,12 +278,13 @@ function renderFaqPage(siteUrl: string, siteName: string): string {
     ],
   });
 
+  // Plain HTML only — JSON-LD above is the single source of truth for schema.
+  // Mixing JSON-LD + microdata on the same page causes "Duplicate field" errors
+  // in Google Rich Results Test.
   const faqHtml = FAQ_ITEMS.map(
-    (f) => `<div itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
-  <h2 itemprop="name">${esc(f.q)}</h2>
-  <div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
-    <p itemprop="text">${esc(f.a)}</p>
-  </div>
+    (f) => `<div>
+  <h2>${esc(f.q)}</h2>
+  <p>${esc(f.a)}</p>
 </div>`,
   ).join("\n");
 
@@ -317,7 +318,7 @@ function renderFaqPage(siteUrl: string, siteName: string): string {
     <a href="${esc(siteUrl)}/faq">FAQ</a>
   </nav>
 </header>
-<main itemscope itemtype="https://schema.org/FAQPage">
+<main>
   <nav aria-label="Breadcrumb">
     <ol>
       <li><a href="${esc(siteUrl)}/">Home</a></li>
@@ -358,13 +359,21 @@ function renderAccountHtml(req: Request, data: AccountPageData): string {
 
   const pageTitle = `${acc.title} — Buy PUBG Account | ${siteName}`;
 
+  // Always include image — required by Google for Product rich results.
+  // Fall back to the site OG image when no account image exists.
+  const finalImageUrl = imageUrl ?? `${siteUrl}/opengraph.jpg`;
+
   const productSchema: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: acc.title,
     description: metaDesc,
     url: canonicalUrl,
-    brand: { "@type": "Organization", name: siteName },
+    image: finalImageUrl,
+    brand: {
+      "@type": "Brand",
+      name: siteName,
+    },
     offers: {
       "@type": "Offer",
       priceCurrency: "PKR",
@@ -374,7 +383,6 @@ function renderAccountHtml(req: Request, data: AccountPageData): string {
       seller: { "@type": "Organization", name: siteName, url: siteUrl },
     },
   };
-  if (imageUrl) productSchema["image"] = imageUrl;
 
   const breadcrumbSchema = {
     "@context": "https://schema.org",
@@ -408,13 +416,13 @@ function renderAccountHtml(req: Request, data: AccountPageData): string {
 <meta property="og:description" content="${esc(metaDesc)}">
 <meta property="og:url" content="${esc(canonicalUrl)}">
 <meta property="og:site_name" content="${esc(siteName)}">
-${imageUrl ? `<meta property="og:image" content="${esc(imageUrl)}">` : ""}
-${imageUrl ? `<meta property="og:image:width" content="1200">` : ""}
-${imageUrl ? `<meta property="og:image:height" content="630">` : ""}
+<meta property="og:image" content="${esc(finalImageUrl)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(pageTitle)}">
 <meta name="twitter:description" content="${esc(metaDesc)}">
-${imageUrl ? `<meta name="twitter:image" content="${esc(imageUrl)}">` : ""}
+<meta name="twitter:image" content="${esc(finalImageUrl)}">
 <script type="application/ld+json">${JSON.stringify(productSchema)}</script>
 <script type="application/ld+json">${JSON.stringify(breadcrumbSchema)}</script>
 </head>
@@ -435,20 +443,11 @@ ${imageUrl ? `<meta name="twitter:image" content="${esc(imageUrl)}">` : ""}
       <li aria-current="page">${esc(acc.title)}</li>
     </ol>
   </nav>
-  <article itemscope itemtype="https://schema.org/Product">
-    <h1 itemprop="name">${esc(acc.title)}</h1>
+  <article>
+    <h1>${esc(acc.title)}</h1>
     ${imageHtml}
     ${priceHtml}
-    <div itemprop="description"><p>${esc(bodyDescription)}</p></div>
-    <div itemprop="offers" itemscope itemtype="https://schema.org/Offer">
-      <meta itemprop="priceCurrency" content="PKR">
-      ${priceRaw ? `<meta itemprop="price" content="${priceRaw.toFixed(2)}">` : ""}
-      <meta itemprop="availability" content="https://schema.org/InStock">
-      <link itemprop="url" href="${esc(canonicalUrl)}">
-    </div>
-    <div itemprop="brand" itemscope itemtype="https://schema.org/Organization">
-      <meta itemprop="name" content="${esc(siteName)}">
-    </div>
+    <p>${esc(bodyDescription)}</p>
   </article>
   <section>
     <h2>Browse More PUBG Accounts</h2>
