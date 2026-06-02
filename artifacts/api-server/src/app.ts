@@ -10,7 +10,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { db } from "@workspace/db";
 import { accountsTable, settingsTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { prerenderMiddleware } from "./middleware/prerender";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -271,7 +271,7 @@ app.get("/sitemap.xml", async (req, res) => {
       process.env.SITE_URL?.replace(/\/$/, "") ||
       `${req.protocol}://${req.headers.host}`;
 
-    // Fetch all active, public, non-deleted accounts that have slugs
+    // Fetch all active, publicly visible, non-deleted accounts that have slugs
     const activeAccounts = await db
       .select({
         id: accountsTable.id,
@@ -280,14 +280,20 @@ app.get("/sitemap.xml", async (req, res) => {
         imageUrls: accountsTable.imageUrls,
       })
       .from(accountsTable)
-      .where(eq(accountsTable.status, "active"));
+      .where(
+        and(
+          eq(accountsTable.status, "active"),
+          eq(accountsTable.visibility, "public"),
+        ),
+      );
 
     // ── Static public pages ──────────────────────────────────────────────────
+    // /signup and /login are intentionally excluded — form pages, no SEO value,
+    // and blocked in robots.txt (Disallow: /signup, Disallow: /login).
     const staticUrls: Array<{ loc: string; changefreq: string; priority: string; lastmod?: string }> = [
-      { loc: `${origin}/`,        changefreq: "daily",   priority: "1.0" },
+      { loc: `${origin}/`,         changefreq: "daily",  priority: "1.0" },
       { loc: `${origin}/accounts`, changefreq: "daily",  priority: "0.9" },
-      { loc: `${origin}/faq`,     changefreq: "weekly",  priority: "0.7" },
-      { loc: `${origin}/signup`,  changefreq: "monthly", priority: "0.5" },
+      { loc: `${origin}/faq`,      changefreq: "weekly", priority: "0.7" },
     ];
 
     // ── Dynamic account pages ────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 <!--
   NOTE: This static file is a fallback for local development only.
   In production, /sitemap.xml is served dynamically by Express
-  and includes all active account pages from the database.
+  and includes all active public account pages from the database.
 -->
 <urlset
   xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
@@ -10,11 +10,18 @@
   xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
     http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
 
-  <!-- Marketplace homepage — most important, inventory changes daily -->
+  <!-- Marketplace homepage -->
   <url>
     <loc>https://www.codexstocks.org/</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
+  </url>
+
+  <!-- All accounts hub -->
+  <url>
+    <loc>https://www.codexstocks.org/accounts</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
   </url>
 
   <!-- FAQ — long-tail SEO, answers buyer questions -->
@@ -24,16 +31,12 @@
     <priority>0.7</priority>
   </url>
 
-  <!-- Signup — acquisition page for new buyers -->
-  <url>
-    <loc>https://www.codexstocks.org/signup</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-
   <!--
-    Individual account pages (/account/:id) are not listed here.
-    They are injected dynamically by the Express server from the database.
+    /signup is intentionally excluded — it is a form page with no SEO value
+    and is blocked in robots.txt.
+
+    Individual account pages (/account/:slug) are injected dynamically
+    by the Express server from the database.
   -->
 
 </urlset>

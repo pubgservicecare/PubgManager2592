@@ -13,6 +13,7 @@ interface SEOOptions {
   type?: "website" | "product";
   price?: string;
   breadcrumbs?: BreadcrumbItem[];
+  noindex?: boolean;
 }
 
 const SITE_NAME = "CodexStocks";
@@ -65,6 +66,7 @@ export function useSEO({
   type = "website",
   price,
   breadcrumbs,
+  noindex = false,
 }: SEOOptions) {
   useEffect(() => {
     const finalTitle = title ? `${title} | ${SITE_NAME}` : DEFAULT_TITLE;
@@ -90,6 +92,8 @@ export function useSEO({
     setMeta('meta[name="twitter:image"]', "name", "twitter:image", finalImage);
 
     setCanonical(finalCanonical);
+
+    setMeta('meta[name="robots"]', "name", "robots", noindex ? "noindex, nofollow" : "index, follow");
 
     if (type === "product" && price) {
       setJsonLd("product", {
@@ -130,5 +134,5 @@ export function useSEO({
         })),
       });
     }
-  }, [title, description, image, canonical, type, price, breadcrumbs]);
+  }, [title, description, image, canonical, type, price, breadcrumbs, noindex]);
 }

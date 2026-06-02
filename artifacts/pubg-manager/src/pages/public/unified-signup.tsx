@@ -32,6 +32,7 @@ export function UnifiedSignup() {
     title: "Sign Up — Create Your Customer Account",
     description:
       "Create a customer account on PUBG Account Manager. After signing in, you can apply to become a verified seller.",
+    noindex: true,
   });
   return <CustomerSignupForm />;
 }
@@ -45,6 +46,7 @@ export function SellerSignupPage() {
   useSEO({
     title: "Become a Seller",
     description: "Apply to become a verified seller on PUBG Account Manager.",
+    noindex: true,
   });
 
   useEffect(() => {

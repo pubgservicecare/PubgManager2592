@@ -1,27 +1,26 @@
 # ── Robots.txt — codexstocks.org ────────────────────────────────────────────
-# Allow all crawlers to index public marketplace pages.
-# Block private portals, API endpoints, and session-based pages.
+# Allow crawlers to index the public marketplace.
+# Block private portals, auth pages, and API endpoints.
 
 User-agent: *
 
-# ── Public pages — explicitly allow crawling ─────────────────────────────────
+# ── Public pages (crawlable) ─────────────────────────────────────────────────
 Allow: /
 Allow: /account/
 Allow: /accounts
 Allow: /faq
-Allow: /signup
 
-# ── Private portals — block completely ──────────────────────────────────────
+# ── Auth & signup — no SEO value, do not crawl ──────────────────────────────
+Disallow: /signup
+Disallow: /login
+
+# ── Private portals ─────────────────────────────────────────────────────────
 Disallow: /admin
 Disallow: /my/
 Disallow: /seller/
 
-# ── Auth pages — low SEO value, skip ────────────────────────────────────────
-Disallow: /login
-Disallow: /signup/
+# ── Utility & internal ───────────────────────────────────────────────────────
 Disallow: /chat
-
-# ── API and internal endpoints ───────────────────────────────────────────────
 Disallow: /api/
 
 # ── Sitemap location ─────────────────────────────────────────────────────────

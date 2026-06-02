@@ -12,6 +12,7 @@ export function UnifiedLogin() {
   useSEO({
     title: "Login",
     description: "Login with your phone or email to access PUBG Account Manager.",
+    noindex: true,
   });
 
   const [, setLocation] = useLocation();
