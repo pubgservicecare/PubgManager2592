@@ -71,7 +71,9 @@ export function useAccountReviews(accountId: number | undefined) {
   return useQuery<ReviewsData>({
     queryKey: ["reviews", accountId],
     queryFn: async () => {
-      const res = await fetch(`/api/accounts/${accountId}/reviews`);
+      const res = await fetch(`/api/accounts/${accountId}/reviews`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch reviews");
       return res.json();
     },
@@ -98,6 +100,7 @@ export function ReviewSection({ accountId }: { accountId: number }) {
     }) => {
       const res = await fetch(`/api/accounts/${accountId}/reviews`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           rating,
