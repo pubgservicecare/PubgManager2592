@@ -40,5 +40,6 @@ export function useAccountReviews(accountId: number | undefined) {
     },
     enabled: !!accountId && accountId > 0,
     staleTime: 0,
+    gcTime: 0,
   });
 }

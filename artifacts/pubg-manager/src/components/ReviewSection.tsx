@@ -4,7 +4,6 @@ import { Star, ShieldCheck, MessageCircle, LogIn, UserPlus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { useAccountReviews } from "@/hooks/use-account-reviews";
-export type { ReviewsData } from "@/hooks/use-account-reviews";
 
 function StarRating({
   rating,
@@ -169,6 +168,21 @@ export function ReviewSection({ accountId }: { accountId: number }) {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Logged-in, no form showing and not loading → something is off, show refresh hint */}
+      {!isLoading && isLoggedIn && !canReview && !hasReviewed && (
+        <div className="bg-[#11151E] border border-[#1E293B] rounded-2xl p-4 text-center">
+          <p className="text-sm text-slate-400">
+            ⭐ Want to rate this account?{" "}
+            <button
+              onClick={() => window.location.reload()}
+              className="text-orange-400 hover:text-orange-300 underline font-medium"
+            >
+              Refresh the page
+            </button>
+          </p>
         </div>
       )}
 
