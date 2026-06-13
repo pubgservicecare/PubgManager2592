@@ -118,7 +118,7 @@ router.get(
         }
       }
 
-      res.json({ reviews, aggregateRating, canReview, hasReviewed, myReview });
+      res.json({ reviews, aggregateRating, canReview, hasReviewed, myReview, isLoggedIn: !!customerSess });
     } catch (err) {
       req.log.error({ err }, "reviews: failed to fetch");
       res.status(500).json({ error: "Failed to fetch reviews" });

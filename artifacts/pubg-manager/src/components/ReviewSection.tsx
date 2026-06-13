@@ -1,35 +1,10 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Star, ShieldCheck, MessageCircle } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Star, ShieldCheck, MessageCircle, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
-
-interface ReviewItem {
-  id: number;
-  rating: number;
-  reviewText: string | null;
-  reviewerName: string;
-  createdAt: string;
-}
-
-interface AggregateRating {
-  avgRating: number;
-  count: number;
-}
-
-export interface ReviewsData {
-  reviews: ReviewItem[];
-  aggregateRating: AggregateRating | null;
-  canReview: boolean;
-  hasReviewed: boolean;
-  myReview: {
-    id: number;
-    rating: number;
-    reviewText: string | null;
-    approved: boolean;
-    createdAt: string;
-  } | null;
-}
+import { useAccountReviews } from "@/hooks/use-account-reviews";
+export type { ReviewsData } from "@/hooks/use-account-reviews";
 
 function StarRating({
   rating,
@@ -67,20 +42,7 @@ function StarRating({
   );
 }
 
-export function useAccountReviews(accountId: number | undefined) {
-  return useQuery<ReviewsData>({
-    queryKey: ["reviews", accountId],
-    queryFn: async () => {
-      const res = await fetch(`/api/accounts/${accountId}/reviews`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to fetch reviews");
-      return res.json();
-    },
-    enabled: !!accountId && accountId > 0,
-    staleTime: 60_000,
-  });
-}
+export { useAccountReviews };
 
 export function ReviewSection({ accountId }: { accountId: number }) {
   const queryClient = useQueryClient();
@@ -159,6 +121,7 @@ export function ReviewSection({ accountId }: { accountId: number }) {
     canReview,
     hasReviewed,
     myReview,
+    isLoggedIn = false,
   } = data ?? {};
 
   return (
@@ -296,16 +259,30 @@ export function ReviewSection({ accountId }: { accountId: number }) {
         </div>
       )}
 
-      {/* ── Login prompt ─────────────────────────────────────────────────── */}
-      {!canReview && !hasReviewed && !isLoading && reviews.length === 0 && (
-        <div className="bg-[#11151E] border border-[#1E293B] rounded-2xl p-4 text-center">
-          <p className="text-sm text-slate-500">
-            <Link href="/login" className="text-orange-400 hover:text-orange-300 font-medium">
-              Login
-            </Link>{" "}
-            after purchasing this account to leave a verified review.
-          </p>
-        </div>
+      {/* ── Auth / purchase prompt ────────────────────────────────────────── */}
+      {!canReview && !hasReviewed && !isLoading && (
+        <>
+          {!isLoggedIn ? (
+            <div className="bg-[#11151E] border border-[#1E293B] rounded-2xl p-4 text-center">
+              <p className="text-sm text-slate-500">
+                <Link
+                  href="/login"
+                  className="text-orange-400 hover:text-orange-300 font-medium"
+                >
+                  Login
+                </Link>{" "}
+                after purchasing this account to leave a verified review.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-[#11151E] border border-[#1E293B] rounded-2xl p-4 flex items-center gap-3">
+              <Lock className="w-4 h-4 text-slate-500 shrink-0" />
+              <p className="text-sm text-slate-500">
+                Only verified purchasers of this account can leave a review.
+              </p>
+            </div>
+          )}
+        </>
       )}
 
       {/* ── Individual reviews ───────────────────────────────────────────── */}

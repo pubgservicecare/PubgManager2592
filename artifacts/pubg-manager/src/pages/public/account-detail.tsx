@@ -20,7 +20,8 @@ import { useSEO } from "@/hooks/use-seo";
 import { WishlistButton } from "@/components/WishlistButton";
 import { ShareButton } from "@/components/ShareButton";
 import { addRecentlyViewed } from "@/lib/recently-viewed";
-import { ReviewSection, useAccountReviews } from "@/components/ReviewSection";
+import { ReviewSection } from "@/components/ReviewSection";
+import { useAccountReviews } from "@/hooks/use-account-reviews";
 
 const SITE_URL = "https://www.codexstocks.org";
 
