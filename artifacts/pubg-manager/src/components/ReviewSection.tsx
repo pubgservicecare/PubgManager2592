@@ -259,30 +259,33 @@ export function ReviewSection({ accountId }: { accountId: number }) {
         </div>
       )}
 
-      {/* ── Auth / purchase prompt ────────────────────────────────────────── */}
-      {!canReview && !hasReviewed && !isLoading && (
-        <>
-          {!isLoggedIn ? (
-            <div className="bg-[#11151E] border border-[#1E293B] rounded-2xl p-4 text-center">
-              <p className="text-sm text-slate-500">
-                <Link
-                  href="/login"
-                  className="text-orange-400 hover:text-orange-300 font-medium"
-                >
-                  Login
-                </Link>{" "}
-                after purchasing this account to leave a verified review.
-              </p>
-            </div>
-          ) : (
-            <div className="bg-[#11151E] border border-[#1E293B] rounded-2xl p-4 flex items-center gap-3">
-              <Lock className="w-4 h-4 text-slate-500 shrink-0" />
-              <p className="text-sm text-slate-500">
-                Only verified purchasers of this account can leave a review.
-              </p>
-            </div>
-          )}
-        </>
+      {/* ── Auth prompt (not logged in) ──────────────────────────────────── */}
+      {!isLoggedIn && !isLoading && (
+        <div className="bg-[#11151E] border border-[#1E293B] rounded-2xl p-5 flex flex-col items-center gap-3 text-center">
+          <Star className="w-7 h-7 text-yellow-400 fill-yellow-400" />
+          <div>
+            <p className="text-sm font-semibold text-white mb-1">
+              Rate this account
+            </p>
+            <p className="text-xs text-slate-400">
+              Create a free account or login to share your rating and review.
+            </p>
+          </div>
+          <div className="flex gap-3 mt-1">
+            <Link
+              href="/signup"
+              className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg transition-colors"
+            >
+              Create Account
+            </Link>
+            <Link
+              href="/login"
+              className="px-4 py-2 bg-[#1E293B] hover:bg-[#263347] text-slate-300 text-xs font-medium rounded-lg transition-colors"
+            >
+              Login
+            </Link>
+          </div>
+        </div>
       )}
 
       {/* ── Individual reviews ───────────────────────────────────────────── */}
@@ -300,7 +303,7 @@ export function ReviewSection({ accountId }: { accountId: number }) {
                       {review.reviewerName}
                     </span>
                     <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/20">
-                      <ShieldCheck className="w-2.5 h-2.5" /> Verified Purchase
+                      <ShieldCheck className="w-2.5 h-2.5" /> Verified Customer
                     </span>
                   </div>
                   <StarRating rating={review.rating} size="sm" />

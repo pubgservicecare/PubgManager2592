@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc } from "drizzle-orm";
-import { db, reviewsTable, accountsTable, customerUsersTable } from "@workspace/db";
+import { db, reviewsTable, customerUsersTable } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { requireCustomer, getCustomerSession } from "../middlewares/customerAuth";
 
@@ -79,19 +79,6 @@ router.get(
       let myReview: any = null;
 
       if (customerSess) {
-        const [acc] = await db
-          .select({
-            customerId: accountsTable.customerId,
-            status: accountsTable.status,
-          })
-          .from(accountsTable)
-          .where(eq(accountsTable.id, accountId));
-
-        const hasPurchased =
-          acc &&
-          (acc.status === "sold" || acc.status === "installment") &&
-          acc.customerId === customerSess.customerDbId;
-
         const [existing] = await db
           .select()
           .from(reviewsTable)
@@ -103,7 +90,7 @@ router.get(
           );
 
         hasReviewed = !!existing;
-        canReview = !!(hasPurchased && !existing);
+        canReview = !existing;
         if (existing) {
           myReview = {
             id: existing.id,
@@ -166,30 +153,6 @@ router.post(
     }
 
     try {
-      const [acc] = await db
-        .select({
-          customerId: accountsTable.customerId,
-          status: accountsTable.status,
-        })
-        .from(accountsTable)
-        .where(eq(accountsTable.id, accountId));
-
-      if (!acc) {
-        res.status(404).json({ error: "Account not found" });
-        return;
-      }
-
-      const hasPurchased =
-        (acc.status === "sold" || acc.status === "installment") &&
-        acc.customerId === customerSess.customerDbId;
-
-      if (!hasPurchased) {
-        res
-          .status(403)
-          .json({ error: "You can only review accounts you have purchased" });
-        return;
-      }
-
       const [existing] = await db
         .select({ id: reviewsTable.id })
         .from(reviewsTable)
