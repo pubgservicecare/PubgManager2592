@@ -20,6 +20,7 @@ import { useSEO } from "@/hooks/use-seo";
 import { WishlistButton } from "@/components/WishlistButton";
 import { ShareButton } from "@/components/ShareButton";
 import { addRecentlyViewed } from "@/lib/recently-viewed";
+import { ReviewSection, useAccountReviews } from "@/components/ReviewSection";
 
 const SITE_URL = "https://www.codexstocks.org";
 
@@ -262,6 +263,8 @@ export function PublicAccountDetail() {
     .filter((a) => a.id !== id)
     .slice(0, 4);
 
+  const { data: reviewsData } = useAccountReviews(id && id > 0 ? id : undefined);
+
   useSEO({
     title: account
       ? `${account.title} — Buy PUBG Account`
@@ -280,6 +283,18 @@ export function PublicAccountDetail() {
       { name: "All Accounts", url: `${SITE_URL}/accounts` },
       { name: account.title, url: `${SITE_URL}${canonicalPath}` },
     ] : undefined,
+    aggregateRating: reviewsData?.aggregateRating
+      ? {
+          ratingValue: reviewsData.aggregateRating.avgRating,
+          reviewCount: reviewsData.aggregateRating.count,
+        }
+      : null,
+    reviews: reviewsData?.reviews?.slice(0, 5).map((r) => ({
+      authorName: r.reviewerName,
+      ratingValue: r.rating,
+      reviewText: r.reviewText ?? undefined,
+      datePublished: r.createdAt.slice(0, 10),
+    })),
   });
 
   useEffect(() => {
@@ -468,6 +483,9 @@ export function PublicAccountDetail() {
                   </p>
                 )}
               </div>
+
+              {/* ── Customer Reviews ── */}
+              {id > 0 && <ReviewSection accountId={id} />}
 
               {/* ── How it works (mobile) ── */}
               <div className="lg:hidden">

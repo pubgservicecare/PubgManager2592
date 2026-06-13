@@ -10,3 +10,4 @@ export * from "./sellers";
 export * from "./activityLogs";
 export * from "./wishlist";
 export * from "./notifications";
+export * from "./reviews";

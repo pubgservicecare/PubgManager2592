@@ -5,6 +5,18 @@ interface BreadcrumbItem {
   url: string;
 }
 
+interface SEOAggregateRating {
+  ratingValue: number;
+  reviewCount: number;
+}
+
+interface SEOReview {
+  authorName: string;
+  ratingValue: number;
+  reviewText?: string;
+  datePublished: string;
+}
+
 interface SEOOptions {
   title?: string;
   description?: string;
@@ -14,6 +26,8 @@ interface SEOOptions {
   price?: string;
   breadcrumbs?: BreadcrumbItem[];
   noindex?: boolean;
+  aggregateRating?: SEOAggregateRating | null;
+  reviews?: SEOReview[];
 }
 
 const SITE_NAME = "CodexStocks";
@@ -58,6 +72,11 @@ function setJsonLd(id: string, data: object) {
   el.textContent = JSON.stringify(data);
 }
 
+function removeJsonLd(id: string) {
+  const el = document.head.querySelector<HTMLScriptElement>(`script[data-seo="${id}"]`);
+  if (el) el.remove();
+}
+
 export function useSEO({
   title,
   description,
@@ -67,7 +86,14 @@ export function useSEO({
   price,
   breadcrumbs,
   noindex = false,
+  aggregateRating,
+  reviews,
 }: SEOOptions) {
+  const aggKey = aggregateRating
+    ? `${aggregateRating.ratingValue}:${aggregateRating.reviewCount}`
+    : "none";
+  const reviewsKey = reviews?.length ?? 0;
+
   useEffect(() => {
     const finalTitle = title ? `${title} | ${SITE_NAME}` : DEFAULT_TITLE;
     const finalDescription = description || DEFAULT_DESCRIPTION;
@@ -96,7 +122,7 @@ export function useSEO({
     setMeta('meta[name="robots"]', "name", "robots", noindex ? "noindex, nofollow" : "index, follow");
 
     if (type === "product" && price) {
-      setJsonLd("product", {
+      const productData: Record<string, unknown> = {
         "@context": "https://schema.org",
         "@type": "Product",
         name: title,
@@ -119,7 +145,36 @@ export function useSEO({
             url: SITE_URL,
           },
         },
-      });
+      };
+
+      if (aggregateRating && aggregateRating.reviewCount > 0) {
+        productData.aggregateRating = {
+          "@type": "AggregateRating",
+          ratingValue: aggregateRating.ratingValue.toFixed(1),
+          reviewCount: aggregateRating.reviewCount,
+          bestRating: "5",
+          worstRating: "1",
+        };
+      }
+
+      if (reviews && reviews.length > 0) {
+        productData.review = reviews.slice(0, 5).map((r) => ({
+          "@type": "Review",
+          author: { "@type": "Person", name: r.authorName },
+          reviewRating: {
+            "@type": "Rating",
+            ratingValue: r.ratingValue,
+            bestRating: "5",
+            worstRating: "1",
+          },
+          ...(r.reviewText ? { reviewBody: r.reviewText } : {}),
+          datePublished: r.datePublished,
+        }));
+      }
+
+      setJsonLd("product", productData);
+    } else {
+      removeJsonLd("product");
     }
 
     if (breadcrumbs && breadcrumbs.length > 0) {
@@ -134,5 +189,5 @@ export function useSEO({
         })),
       });
     }
-  }, [title, description, image, canonical, type, price, breadcrumbs, noindex]);
+  }, [title, description, image, canonical, type, price, breadcrumbs, noindex, aggKey, reviewsKey]);
 }

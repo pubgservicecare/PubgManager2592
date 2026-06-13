@@ -97,6 +97,9 @@ const AdminActivity = lazy(() =>
 const AdminDocs = lazy(() =>
   import("@/pages/admin/docs").then((m) => ({ default: m.AdminDocs }))
 );
+const AdminReviews = lazy(() =>
+  import("@/pages/admin/reviews").then((m) => ({ default: m.AdminReviews }))
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -153,6 +156,7 @@ function Router() {
         <Route path="/admin/activity" component={AdminActivity} />
         <Route path="/admin/docs" component={AdminDocs} />
         <Route path="/admin/settings" component={AdminSettings} />
+        <Route path="/admin/reviews" component={AdminReviews} />
 
         <Route component={NotFound} />
       </Switch>

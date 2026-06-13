@@ -18,9 +18,16 @@
  */
 
 import { type Request, type Response, type NextFunction } from "express";
-import { eq } from "drizzle-orm";
-import { db, accountsTable, settingsTable } from "@workspace/db";
+import { eq, and, desc } from "drizzle-orm";
+import { db, accountsTable, settingsTable, reviewsTable, customerUsersTable } from "@workspace/db";
 import { logger } from "../lib/logger";
+
+interface PrerenderReview {
+  rating: number;
+  reviewText: string | null;
+  reviewerName: string;
+  createdAt: Date;
+}
 
 // ── Crawler detection ──────────────────────────────────────────────────────────
 
@@ -336,15 +343,25 @@ function renderFaqPage(siteUrl: string, siteName: string): string {
 
 // ── Account page renderer ──────────────────────────────────────────────────────
 
+function maskName(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((p) => (p.length <= 1 ? p : p[0] + "*".repeat(Math.min(p.length - 1, 3))))
+    .join(" ");
+}
+
 interface AccountPageData {
   acc: typeof accountsTable.$inferSelect;
   siteName: string;
   siteUrl: string;
   imageUrl: string | null;
+  reviews?: PrerenderReview[];
+  aggregateRating?: { avgRating: number; count: number } | null;
 }
 
 function renderAccountHtml(req: Request, data: AccountPageData): string {
-  const { acc, siteName, siteUrl, imageUrl } = data;
+  const { acc, siteName, siteUrl, imageUrl, reviews = [], aggregateRating } = data;
 
   const accountPath = acc.slug ? `/account/${acc.slug}` : `/account/${acc.id}`;
   const canonicalUrl = `${siteUrl}${accountPath}`;
@@ -383,6 +400,33 @@ function renderAccountHtml(req: Request, data: AccountPageData): string {
       seller: { "@type": "Organization", name: siteName, url: siteUrl },
     },
   };
+
+  if (aggregateRating && aggregateRating.count > 0) {
+    productSchema.aggregateRating = {
+      "@type": "AggregateRating",
+      ratingValue: aggregateRating.avgRating.toFixed(1),
+      reviewCount: aggregateRating.count,
+      bestRating: "5",
+      worstRating: "1",
+    };
+  }
+
+  if (reviews.length > 0) {
+    productSchema.review = reviews.slice(0, 5).map((r) => ({
+      "@type": "Review",
+      author: { "@type": "Person", name: r.reviewerName },
+      reviewRating: {
+        "@type": "Rating",
+        ratingValue: String(r.rating),
+        bestRating: "5",
+        worstRating: "1",
+      },
+      ...(r.reviewText ? { reviewBody: r.reviewText } : {}),
+      datePublished: r.createdAt instanceof Date
+        ? r.createdAt.toISOString().slice(0, 10)
+        : String(r.createdAt).slice(0, 10),
+    }));
+  }
 
   const breadcrumbSchema = {
     "@context": "https://schema.org",
@@ -549,7 +593,38 @@ export async function prerenderMiddleware(
       imageUrl = `${siteUrl}/api/storage${settings.logoUrl}`;
     }
 
-    const html = renderAccountHtml(req, { acc, siteName, siteUrl, imageUrl });
+    // Fetch all approved reviews for SEO structured data + aggregate rating
+    const allReviewRows = await db
+      .select({
+        rating: reviewsTable.rating,
+        reviewText: reviewsTable.reviewText,
+        createdAt: reviewsTable.createdAt,
+        customerName: customerUsersTable.name,
+      })
+      .from(reviewsTable)
+      .leftJoin(customerUsersTable, eq(reviewsTable.customerUserId, customerUsersTable.id))
+      .where(and(eq(reviewsTable.accountId, acc.id), eq(reviewsTable.approved, true)))
+      .orderBy(desc(reviewsTable.createdAt));
+
+    const allReviews: PrerenderReview[] = allReviewRows.map((r) => ({
+      rating: r.rating,
+      reviewText: r.reviewText ?? null,
+      createdAt: r.createdAt,
+      reviewerName: maskName(r.customerName || "Anonymous"),
+    }));
+
+    const reviews = allReviews.slice(0, 5);
+
+    let aggregateRating: { avgRating: number; count: number } | null = null;
+    if (allReviews.length > 0) {
+      const sum = allReviews.reduce((s: number, r: PrerenderReview) => s + r.rating, 0);
+      aggregateRating = {
+        avgRating: Math.round((sum / allReviews.length) * 10) / 10,
+        count: allReviews.length,
+      };
+    }
+
+    const html = renderAccountHtml(req, { acc, siteName, siteUrl, imageUrl, reviews, aggregateRating });
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=3600");
