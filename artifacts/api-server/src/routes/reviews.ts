@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc } from "drizzle-orm";
 import { db, reviewsTable, customerUsersTable } from "@workspace/db";
+import { accountsTable } from "@workspace/db/schema";
 import { requireAdmin } from "../middlewares/auth";
 import { requireCustomer, getCustomerSession } from "../middlewares/customerAuth";
 
@@ -14,6 +15,51 @@ function maskName(name: string): string {
     )
     .join(" ");
 }
+
+// ── Public: Get ALL approved reviews (for /reviews page) ──────────────────
+router.get(
+  "/reviews",
+  async (req, res): Promise<void> => {
+    try {
+      const rows = await db
+        .select({
+          id: reviewsTable.id,
+          accountId: reviewsTable.accountId,
+          rating: reviewsTable.rating,
+          reviewText: reviewsTable.reviewText,
+          createdAt: reviewsTable.createdAt,
+          customerName: customerUsersTable.name,
+          accountTitle: accountsTable.title,
+          accountSlug: accountsTable.slug,
+        })
+        .from(reviewsTable)
+        .leftJoin(customerUsersTable, eq(reviewsTable.customerUserId, customerUsersTable.id))
+        .leftJoin(accountsTable, eq(reviewsTable.accountId, accountsTable.id))
+        .where(eq(reviewsTable.approved, true))
+        .orderBy(desc(reviewsTable.createdAt));
+
+      const reviews = rows.map((r) => ({
+        id: r.id,
+        accountId: r.accountId,
+        accountTitle: r.accountTitle ?? "PUBG Account",
+        accountSlug: r.accountSlug ?? null,
+        rating: r.rating,
+        reviewText: r.reviewText ?? null,
+        reviewerName: maskName(r.customerName || "Anonymous"),
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+      }));
+
+      const avgRating = reviews.length > 0
+        ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10
+        : null;
+
+      res.json({ reviews, avgRating, totalCount: reviews.length });
+    } catch (err) {
+      req.log.error({ err }, "public reviews: failed to fetch");
+      res.status(500).json({ error: "Failed to fetch reviews" });
+    }
+  }
+);
 
 // ── Public: Get approved reviews + aggregate for an account ───────────────
 router.get(

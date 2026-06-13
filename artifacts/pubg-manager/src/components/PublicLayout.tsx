@@ -19,6 +19,7 @@ import {
   MessageCircle,
   MapPin,
   Mail,
+  Star,
 } from "lucide-react";
 import { useGetSettings } from "@workspace/api-client-react";
 import { useCustomerAuth } from "@/hooks/use-customer-auth";
@@ -389,7 +390,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
 
       <footer className="bg-gradient-to-b from-card to-background border-t border-border mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-8">
             {/* Quick Links */}
             <div>
               <h4 className="text-xs font-bold uppercase tracking-widest text-white mb-4">
@@ -399,6 +400,11 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
                 <li>
                   <Link href="/">
                     <span className="text-muted-foreground hover:text-primary cursor-pointer transition-colors">Marketplace</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/accounts">
+                    <span className="text-muted-foreground hover:text-primary cursor-pointer transition-colors">All Accounts</span>
                   </Link>
                 </li>
                 <li>
@@ -414,6 +420,30 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
                 <li>
                   <Link href="/seller/signup">
                     <span className="text-muted-foreground hover:text-primary cursor-pointer transition-colors">Become a Seller</span>
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Reviews */}
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-widest text-white mb-4">
+                Reviews
+              </h4>
+              <ul className="space-y-2.5 text-sm">
+                <li>
+                  <Link href="/reviews">
+                    <span className="text-muted-foreground hover:text-primary cursor-pointer transition-colors">All Reviews</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/reviews">
+                    <span className="text-muted-foreground hover:text-primary cursor-pointer transition-colors">Add a Review</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/signup">
+                    <span className="text-muted-foreground hover:text-primary cursor-pointer transition-colors">Create Account</span>
                   </Link>
                 </li>
               </ul>
@@ -487,8 +517,17 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <div className="mt-10 pt-6 border-t border-border/40 text-center text-xs text-muted-foreground">
-            {footerText || `© ${new Date().getFullYear()} ${settings?.siteName || "PUBG Account Manager"} — All rights reserved.`}
+          {/* Rate this Platform strip */}
+          <div className="mt-10 pt-6 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-muted-foreground">
+              {footerText || `© ${new Date().getFullYear()} ${settings?.siteName || "PUBG Account Manager"} — All rights reserved.`}
+            </p>
+            <Link href="/reviews">
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/20 text-orange-400 text-xs font-bold transition-colors cursor-pointer whitespace-nowrap">
+                <Star className="w-3.5 h-3.5 fill-orange-400" />
+                Rate this Platform
+              </span>
+            </Link>
           </div>
         </div>
       </footer>

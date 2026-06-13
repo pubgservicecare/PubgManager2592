@@ -44,6 +44,9 @@ const WishlistPage = lazy(() =>
 const FAQPage = lazy(() =>
   import("@/pages/public/faq").then((m) => ({ default: m.FAQPage }))
 );
+const PublicReviews = lazy(() =>
+  import("@/pages/public/reviews").then((m) => ({ default: m.PublicReviews }))
+);
 const AccountsHub = lazy(() =>
   import("@/pages/public/accounts-hub").then((m) => ({ default: m.AccountsHub }))
 );
@@ -134,6 +137,7 @@ function Router() {
         <Route path="/my/wishlist" component={WishlistPage} />
         <Route path="/accounts" component={AccountsHub} />
         <Route path="/faq" component={FAQPage} />
+        <Route path="/reviews" component={PublicReviews} />
         <Route path="/seller/signup" component={SellerSignupPage} />
         <Route path="/seller/login" component={SellerLoginPage} />
         <Route path="/seller/dashboard" component={SellerDashboard} />
