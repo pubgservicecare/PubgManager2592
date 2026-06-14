@@ -28,6 +28,7 @@ router.get(
           rating: reviewsTable.rating,
           reviewText: reviewsTable.reviewText,
           createdAt: reviewsTable.createdAt,
+          featuredOnHome: reviewsTable.featuredOnHome,
           customerName: customerUsersTable.name,
           accountTitle: accountsTable.title,
           accountSlug: accountsTable.slug,
@@ -45,6 +46,7 @@ router.get(
         accountSlug: r.accountSlug ?? null,
         rating: r.rating,
         reviewText: r.reviewText ?? null,
+        featuredOnHome: r.featuredOnHome,
         reviewerName: maskName(r.customerName || "Anonymous"),
         createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
       }));
@@ -57,6 +59,47 @@ router.get(
     } catch (err) {
       req.log.error({ err }, "public reviews: failed to fetch");
       res.status(500).json({ error: "Failed to fetch reviews" });
+    }
+  }
+);
+
+// ── Public: Home page featured reviews ────────────────────────────────────
+router.get(
+  "/home-reviews",
+  async (req, res): Promise<void> => {
+    try {
+      const rows = await db
+        .select({
+          id: reviewsTable.id,
+          accountId: reviewsTable.accountId,
+          rating: reviewsTable.rating,
+          reviewText: reviewsTable.reviewText,
+          createdAt: reviewsTable.createdAt,
+          customerName: customerUsersTable.name,
+          accountTitle: accountsTable.title,
+          accountSlug: accountsTable.slug,
+        })
+        .from(reviewsTable)
+        .leftJoin(customerUsersTable, eq(reviewsTable.customerUserId, customerUsersTable.id))
+        .leftJoin(accountsTable, eq(reviewsTable.accountId, accountsTable.id))
+        .where(and(eq(reviewsTable.approved, true), eq(reviewsTable.featuredOnHome, true)))
+        .orderBy(desc(reviewsTable.createdAt));
+
+      const reviews = rows.map((r) => ({
+        id: r.id,
+        accountId: r.accountId,
+        accountTitle: r.accountTitle ?? "PUBG Account",
+        accountSlug: r.accountSlug ?? null,
+        rating: r.rating,
+        reviewText: r.reviewText ?? null,
+        reviewerName: maskName(r.customerName || "Anonymous"),
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+      }));
+
+      res.json({ reviews });
+    } catch (err) {
+      req.log.error({ err }, "home-reviews: failed to fetch");
+      res.status(500).json({ error: "Failed to fetch home reviews" });
     }
   }
 );
@@ -271,6 +314,7 @@ router.get(
           rating: reviewsTable.rating,
           reviewText: reviewsTable.reviewText,
           approved: reviewsTable.approved,
+          featuredOnHome: reviewsTable.featuredOnHome,
           createdAt: reviewsTable.createdAt,
           customerName: customerUsersTable.name,
           customerPhone: customerUsersTable.phone,
@@ -305,6 +349,7 @@ router.get(
           rating: r.rating,
           reviewText: r.reviewText ?? null,
           approved: r.approved,
+          featuredOnHome: r.featuredOnHome,
           createdAt:
             r.createdAt instanceof Date
               ? r.createdAt.toISOString()
@@ -318,7 +363,7 @@ router.get(
   }
 );
 
-// ── Admin: Approve / reject a review ──────────────────────────────────────
+// ── Admin: Approve / reject / feature a review ────────────────────────────
 router.patch(
   "/admin/reviews/:id",
   requireAdmin,
@@ -329,16 +374,21 @@ router.patch(
       return;
     }
 
-    const { approved } = req.body;
-    if (typeof approved !== "boolean") {
-      res.status(400).json({ error: "'approved' must be a boolean" });
+    const { approved, featuredOnHome } = req.body;
+
+    const updateData: Record<string, any> = { updatedAt: new Date() };
+    if (typeof approved === "boolean") updateData.approved = approved;
+    if (typeof featuredOnHome === "boolean") updateData.featuredOnHome = featuredOnHome;
+
+    if (Object.keys(updateData).length === 1) {
+      res.status(400).json({ error: "No valid fields to update" });
       return;
     }
 
     try {
       const [updated] = await db
         .update(reviewsTable)
-        .set({ approved, updatedAt: new Date() })
+        .set(updateData)
         .where(eq(reviewsTable.id, id))
         .returning();
 
@@ -347,7 +397,7 @@ router.patch(
         return;
       }
 
-      res.json({ id: updated.id, approved: updated.approved });
+      res.json({ id: updated.id, approved: updated.approved, featuredOnHome: updated.featuredOnHome });
     } catch (err) {
       req.log.error({ err }, "admin reviews: failed to update");
       res.status(500).json({ error: "Failed to update review" });

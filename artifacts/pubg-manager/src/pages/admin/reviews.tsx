@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/AdminLayout";
-import { Star, CheckCircle, XCircle, Trash2, MessageCircle } from "lucide-react";
+import { Star, CheckCircle, XCircle, Trash2, MessageCircle, Home } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -16,6 +16,7 @@ interface AdminReview {
   rating: number;
   reviewText: string | null;
   approved: boolean;
+  featuredOnHome: boolean;
   createdAt: string;
 }
 
@@ -52,25 +53,24 @@ export function AdminReviews() {
     },
   });
 
-  const approveMutation = useMutation({
-    mutationFn: async ({
-      id,
-      approved,
-    }: {
-      id: number;
-      approved: boolean;
-    }) => {
+  const patchMutation = useMutation({
+    mutationFn: async ({ id, patch }: { id: number; patch: Record<string, boolean> }) => {
       const res = await fetch(`/api/admin/reviews/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approved }),
+        body: JSON.stringify(patch),
       });
       if (!res.ok) throw new Error("Failed to update review");
       return res.json();
     },
-    onSuccess: (_, { approved }) => {
+    onSuccess: (_, { patch }) => {
       queryClient.invalidateQueries({ queryKey: ["admin-reviews"] });
-      toast({ title: approved ? "Review approved ✓" : "Review unapproved" });
+      if ("approved" in patch) {
+        toast({ title: patch.approved ? "Review approved ✓" : "Review unapproved" });
+      }
+      if ("featuredOnHome" in patch) {
+        toast({ title: patch.featuredOnHome ? "⭐ Added to Home Page" : "Removed from Home Page" });
+      }
     },
     onError: (err: any) =>
       toast({ title: "Error", description: err.message, variant: "destructive" }),
@@ -78,9 +78,7 @@ export function AdminReviews() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/reviews/${id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/admin/reviews/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete review");
       return res.json();
     },
@@ -94,6 +92,7 @@ export function AdminReviews() {
   });
 
   const pending = reviews.filter((r) => !r.approved).length;
+  const featuredCount = reviews.filter((r) => r.featuredOnHome).length;
 
   return (
     <AdminLayout>
@@ -106,14 +105,29 @@ export function AdminReviews() {
               Customer Reviews
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Moderate and approve customer reviews before they appear publicly.
+              Moderate reviews and choose which ones appear on the home page.
             </p>
           </div>
-          {pending > 0 && (
-            <span className="bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 text-sm font-bold px-3 py-1.5 rounded-full">
-              {pending} pending
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {featuredCount > 0 && (
+              <span className="bg-orange-500/10 text-orange-400 border border-orange-500/20 text-sm font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                <Home className="w-3.5 h-3.5" /> {featuredCount} on home
+              </span>
+            )}
+            {pending > 0 && (
+              <span className="bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 text-sm font-bold px-3 py-1.5 rounded-full">
+                {pending} pending
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Info banner */}
+        <div className="bg-orange-500/5 border border-orange-500/20 rounded-xl p-3 flex items-start gap-3">
+          <Home className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
+          <p className="text-xs text-slate-400 leading-relaxed">
+            <span className="text-orange-300 font-semibold">Home Page Reviews:</span> Approve a review first, then click the <span className="text-orange-300 font-semibold">🏠 Show on Home</span> button to feature it on the home page. Only featured reviews appear in the "What Customers Say" section.
+          </p>
         </div>
 
         {/* Filter tabs */}
@@ -142,19 +156,14 @@ export function AdminReviews() {
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-28 bg-card rounded-2xl animate-pulse border border-border"
-              />
+              <div key={i} className="h-28 bg-card rounded-2xl animate-pulse border border-border" />
             ))}
           </div>
         ) : reviews.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
             <MessageCircle className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p className="text-sm font-medium">No reviews found.</p>
-            <p className="text-xs mt-1 opacity-60">
-              Reviews appear here after customers submit them.
-            </p>
+            <p className="text-xs mt-1 opacity-60">Reviews appear here after customers submit them.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -162,14 +171,16 @@ export function AdminReviews() {
               <div
                 key={review.id}
                 className={`bg-card border rounded-2xl p-5 transition-colors ${
-                  !review.approved
+                  review.featuredOnHome
+                    ? "border-orange-500/30"
+                    : !review.approved
                     ? "border-yellow-500/20"
                     : "border-border"
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    {/* Account + status badge */}
+                    {/* Account + status badges */}
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <Link href={`/admin/accounts/${review.accountId}`}>
                         <span className="text-sm font-semibold text-primary hover:underline truncate max-w-xs cursor-pointer">
@@ -185,20 +196,19 @@ export function AdminReviews() {
                       >
                         {review.approved ? "Approved" : "Pending"}
                       </span>
+                      {review.featuredOnHome && (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-orange-500/10 text-orange-400 border-orange-500/20 flex items-center gap-1">
+                          <Home className="w-2.5 h-2.5" /> On Home
+                        </span>
+                      )}
                     </div>
 
                     {/* Customer + rating */}
                     <div className="flex flex-wrap items-center gap-3 mb-2">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {review.customerName}
-                      </span>
-                      <span className="text-xs text-muted-foreground opacity-60">
-                        {review.customerPhone}
-                      </span>
+                      <span className="text-xs font-medium text-muted-foreground">{review.customerName}</span>
+                      <span className="text-xs text-muted-foreground opacity-60">{review.customerPhone}</span>
                       <StarDisplay rating={review.rating} />
-                      <span className="text-xs text-muted-foreground opacity-60">
-                        {review.rating}/5
-                      </span>
+                      <span className="text-xs text-muted-foreground opacity-60">{review.rating}/5</span>
                     </div>
 
                     {/* Review text */}
@@ -211,46 +221,50 @@ export function AdminReviews() {
                     {/* Date */}
                     <p className="text-[11px] text-muted-foreground/40 mt-2">
                       {new Date(review.createdAt).toLocaleString("en-PK", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
+                        day: "numeric", month: "short", year: "numeric",
+                        hour: "2-digit", minute: "2-digit",
                       })}
                     </p>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    {/* Approve / Unapprove */}
                     {!review.approved ? (
                       <button
-                        onClick={() =>
-                          approveMutation.mutate({
-                            id: review.id,
-                            approved: true,
-                          })
-                        }
-                        disabled={approveMutation.isPending}
+                        onClick={() => patchMutation.mutate({ id: review.id, patch: { approved: true } })}
+                        disabled={patchMutation.isPending}
                         className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
                       >
-                        <CheckCircle className="w-3.5 h-3.5" />
-                        Approve
+                        <CheckCircle className="w-3.5 h-3.5" /> Approve
                       </button>
                     ) : (
                       <button
-                        onClick={() =>
-                          approveMutation.mutate({
-                            id: review.id,
-                            approved: false,
-                          })
-                        }
-                        disabled={approveMutation.isPending}
+                        onClick={() => patchMutation.mutate({ id: review.id, patch: { approved: false } })}
+                        disabled={patchMutation.isPending}
                         className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
                       >
-                        <XCircle className="w-3.5 h-3.5" />
-                        Unapprove
+                        <XCircle className="w-3.5 h-3.5" /> Unapprove
                       </button>
                     )}
+
+                    {/* Feature on Home — only for approved reviews */}
+                    {review.approved && (
+                      <button
+                        onClick={() => patchMutation.mutate({ id: review.id, patch: { featuredOnHome: !review.featuredOnHome } })}
+                        disabled={patchMutation.isPending}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-50 border ${
+                          review.featuredOnHome
+                            ? "bg-orange-500/20 hover:bg-orange-500/10 text-orange-400 border-orange-500/30"
+                            : "bg-secondary hover:bg-orange-500/10 text-muted-foreground hover:text-orange-400 border-border hover:border-orange-500/30"
+                        }`}
+                      >
+                        <Home className="w-3.5 h-3.5" />
+                        {review.featuredOnHome ? "Remove from Home" : "Show on Home"}
+                      </button>
+                    )}
+
+                    {/* Delete */}
                     <button
                       onClick={() => setDeleteId(review.id)}
                       className="p-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"

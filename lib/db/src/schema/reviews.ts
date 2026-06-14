@@ -10,6 +10,7 @@ export const reviewsTable = pgTable("reviews", {
   rating: smallint("rating").notNull(),
   reviewText: text("review_text"),
   approved: boolean("approved").notNull().default(false),
+  featuredOnHome: boolean("featured_on_home").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
