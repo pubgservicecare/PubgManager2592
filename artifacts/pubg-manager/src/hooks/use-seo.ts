@@ -144,6 +144,49 @@ export function useSEO({
             name: SITE_NAME,
             url: SITE_URL,
           },
+          // Digital delivery — no physical shipment, instant transfer
+          shippingDetails: {
+            "@type": "OfferShippingDetails",
+            shippingRate: {
+              "@type": "MonetaryAmount",
+              value: "0",
+              currency: "PKR",
+            },
+            shippingDestination: {
+              "@type": "DefinedRegion",
+              addressCountry: "PK",
+            },
+            deliveryTime: {
+              "@type": "ShippingDeliveryTime",
+              businessDays: {
+                "@type": "OpeningHoursSpecification",
+                dayOfWeek: [
+                  "Monday","Tuesday","Wednesday","Thursday",
+                  "Friday","Saturday","Sunday",
+                ],
+              },
+              cutoffTime: "23:59:59Z",
+              handlingTime: {
+                "@type": "QuantitativeValue",
+                minValue: 0,
+                maxValue: 1,
+                unitCode: "DAY",
+              },
+              transitTime: {
+                "@type": "QuantitativeValue",
+                minValue: 0,
+                maxValue: 0,
+                unitCode: "DAY",
+              },
+            },
+          },
+          // Digital goods cannot be returned after account credentials are transferred
+          hasMerchantReturnPolicy: {
+            "@type": "MerchantReturnPolicy",
+            applicableCountry: "PK",
+            returnPolicyCategory:
+              "https://schema.org/MerchantReturnNotPermitted",
+          },
         },
       };
 
