@@ -1,8 +1,9 @@
+import { useState, useMemo } from "react";
 import { PublicLayout } from "@/components/PublicLayout";
 import { useListAccounts } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { useSEO } from "@/hooks/use-seo";
-import { ShieldCheck, Package, ChevronRight } from "lucide-react";
+import { ShieldCheck, Package, ChevronRight, Search, X } from "lucide-react";
 
 const GRADIENTS = [
   "from-orange-600 to-rose-700",
@@ -23,8 +24,18 @@ function formatCurrency(value: any) {
 
 export function AccountsHub() {
   const { data: accounts, isLoading } = useListAccounts({ status: "active", public: true } as any);
+  const [query, setQuery] = useState("");
 
   const active = accounts ?? [];
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return active;
+    return active.filter((a) =>
+      a.title?.toLowerCase().includes(q) ||
+      (a as any).description?.toLowerCase().includes(q)
+    );
+  }, [active, query]);
 
   useSEO({
     title: "All PUBG Mobile Accounts for Sale",
@@ -44,7 +55,7 @@ export function AccountsHub() {
         </nav>
 
         {/* Page header */}
-        <header className="mb-8 sm:mb-10">
+        <header className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-display font-black text-white mb-2">
             PUBG Mobile Accounts for Sale
           </h1>
@@ -57,6 +68,28 @@ export function AccountsHub() {
           </p>
         </header>
 
+        {/* Search bar */}
+        {!isLoading && active.length > 0 && (
+          <div className="relative mb-6 max-w-lg">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search accounts by name…"
+              className="w-full bg-[#11151E] border border-[#1E293B] hover:border-[#2D3F5E] focus:border-orange-500/50 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none transition-colors"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Grid */}
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
@@ -64,51 +97,70 @@ export function AccountsHub() {
               <div key={i} className="aspect-[4/3] rounded-xl bg-[#11151E] animate-pulse" />
             ))}
           </div>
-        ) : active.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="text-center py-20">
             <Package className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-            <p className="text-slate-400">No accounts available right now. Check back soon.</p>
+            {query ? (
+              <>
+                <p className="text-slate-400 font-medium">No accounts found for "<span className="text-orange-400">{query}</span>"</p>
+                <button
+                  onClick={() => setQuery("")}
+                  className="mt-3 text-sm text-orange-400 hover:text-orange-300 transition-colors underline"
+                >
+                  Clear search
+                </button>
+              </>
+            ) : (
+              <p className="text-slate-400">No accounts available right now. Check back soon.</p>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-            {active.map((account) => {
-              const slug = (account as any).slug as string | null | undefined;
-              const href = slug ? `/account/${slug}` : `/account/${account.id}`;
-              const imgs = ((account as any).imageUrls ?? []) as string[];
-              const gradient = GRADIENTS[account.id % GRADIENTS.length];
-              return (
-                <Link key={account.id} href={href}>
-                  <article className="group relative overflow-hidden rounded-xl border border-[#1E293B] bg-[#11151E] hover:border-orange-500/40 hover:shadow-[0_0_20px_rgba(249,115,22,0.08)] transition-all duration-300 flex flex-col h-full cursor-pointer">
-                    <div className="relative aspect-[4/3] w-full overflow-hidden">
-                      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-80`} />
-                      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-[#11151E]/60 to-[#11151E]" />
-                      <div className="absolute inset-0 flex items-center justify-center p-4 text-center">
-                        <span className="font-display text-base font-black italic tracking-tighter text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] -rotate-3 group-hover:scale-110 transition-transform duration-500 line-clamp-2">
-                          {account.title}
-                        </span>
+          <>
+            {query && (
+              <p className="text-xs text-slate-500 mb-4">
+                Showing <span className="text-slate-300 font-semibold">{filtered.length}</span> of {active.length} accounts
+              </p>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+              {filtered.map((account) => {
+                const slug = (account as any).slug as string | null | undefined;
+                const href = slug ? `/account/${slug}` : `/account/${account.id}`;
+                const imgs = ((account as any).imageUrls ?? []) as string[];
+                const gradient = GRADIENTS[account.id % GRADIENTS.length];
+                return (
+                  <Link key={account.id} href={href}>
+                    <article className="group relative overflow-hidden rounded-xl border border-[#1E293B] bg-[#11151E] hover:border-orange-500/40 hover:shadow-[0_0_20px_rgba(249,115,22,0.08)] transition-all duration-300 flex flex-col h-full cursor-pointer">
+                      <div className="relative aspect-[4/3] w-full overflow-hidden">
+                        <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-80`} />
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-[#11151E]/60 to-[#11151E]" />
+                        <div className="absolute inset-0 flex items-center justify-center p-4 text-center">
+                          <span className="font-display text-base font-black italic tracking-tighter text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] -rotate-3 group-hover:scale-110 transition-transform duration-500 line-clamp-2">
+                            {account.title}
+                          </span>
+                        </div>
+                        {imgs.length > 0 && (
+                          <>
+                            <img
+                              src={`/api/storage${imgs[0]}`}
+                              alt={`${account.title} — Buy PUBG Mobile Account`}
+                              loading="lazy"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#11151E] via-[#11151E]/30 to-transparent pointer-events-none" />
+                          </>
+                        )}
                       </div>
-                      {imgs.length > 0 && (
-                        <>
-                          <img
-                            src={`/api/storage${imgs[0]}`}
-                            alt={`${account.title} — Buy PUBG Mobile Account`}
-                            loading="lazy"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-[#11151E] via-[#11151E]/30 to-transparent pointer-events-none" />
-                        </>
-                      )}
-                    </div>
-                    <div className="p-3 mt-auto">
-                      <p className="text-xs text-slate-400 font-medium line-clamp-1 mb-1">{account.title}</p>
-                      <p className="text-sm font-bold text-orange-400">{formatCurrency((account as any).priceForSale)}</p>
-                    </div>
-                  </article>
-                </Link>
-              );
-            })}
-          </div>
+                      <div className="p-3 mt-auto">
+                        <p className="text-xs text-slate-400 font-medium line-clamp-1 mb-1">{account.title}</p>
+                        <p className="text-sm font-bold text-orange-400">{formatCurrency((account as any).priceForSale)}</p>
+                      </div>
+                    </article>
+                  </Link>
+                );
+              })}
+            </div>
+          </>
         )}
 
         {/* Trust strip */}
