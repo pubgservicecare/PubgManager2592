@@ -144,7 +144,7 @@ export function useSEO({
             name: SITE_NAME,
             url: SITE_URL,
           },
-          // Digital delivery — no physical shipment, instant transfer
+          // Digital delivery — no physical shipment, instant worldwide transfer
           shippingDetails: {
             "@type": "OfferShippingDetails",
             shippingRate: {
@@ -154,7 +154,7 @@ export function useSEO({
             },
             shippingDestination: {
               "@type": "DefinedRegion",
-              addressCountry: "PK",
+              addressCountry: "001", // UN M.49 code for "World"
             },
             deliveryTime: {
               "@type": "ShippingDeliveryTime",
@@ -183,7 +183,7 @@ export function useSEO({
           // Digital goods cannot be returned after account credentials are transferred
           hasMerchantReturnPolicy: {
             "@type": "MerchantReturnPolicy",
-            applicableCountry: "PK",
+            applicableCountry: "001",
             returnPolicyCategory:
               "https://schema.org/MerchantReturnNotPermitted",
           },
