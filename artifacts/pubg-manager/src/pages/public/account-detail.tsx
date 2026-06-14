@@ -279,6 +279,7 @@ export function PublicAccountDetail() {
       : undefined,
     type: "product",
     price,
+    sku: account?.accountId ?? undefined,
     breadcrumbs: account ? [
       { name: "Home", url: `${SITE_URL}/` },
       { name: "All Accounts", url: `${SITE_URL}/accounts` },

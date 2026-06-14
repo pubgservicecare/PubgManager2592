@@ -29,6 +29,7 @@ interface SEOOptions {
   canonical?: string;
   type?: "website" | "product";
   price?: string;
+  sku?: string;
   breadcrumbs?: BreadcrumbItem[];
   noindex?: boolean;
   aggregateRating?: SEOAggregateRating | null;
@@ -91,6 +92,7 @@ export function useSEO({
   canonical,
   type = "website",
   price,
+  sku,
   breadcrumbs,
   noindex = false,
   aggregateRating,
@@ -139,6 +141,7 @@ export function useSEO({
         description: finalDescription,
         image: finalImage,
         url: finalCanonical,
+        ...(sku ? { sku } : {}),
         brand: {
           "@type": "Brand",
           name: SITE_NAME,
@@ -274,5 +277,5 @@ export function useSEO({
     } else {
       removeJsonLd("organization");
     }
-  }, [title, description, image, canonical, type, price, breadcrumbs, noindex, aggKey, reviewsKey, faqsKey, isHomepage]);
+  }, [title, description, image, canonical, type, price, sku, breadcrumbs, noindex, aggKey, reviewsKey, faqsKey, isHomepage]);
 }
