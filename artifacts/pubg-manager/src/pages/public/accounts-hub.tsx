@@ -55,8 +55,22 @@ export function AccountsHub() {
     });
   }, [active, query, minPrice, maxPrice]);
 
+  const POPULAR_TAGS = ["Mythic", "X-Suit", "Glacier", "Sport Car", "Alan Walker", "Under 50K", "Under 100K", "Rare Items"];
+
   const hasFilters = query || minPrice || maxPrice;
   const clearAll = () => { setQuery(""); setMinPrice(""); setMaxPrice(""); };
+
+  const applyTag = (tag: string) => {
+    if (tag === "Under 50K") { setMinPrice(""); setMaxPrice("50000"); setQuery(""); }
+    else if (tag === "Under 100K") { setMinPrice(""); setMaxPrice("100000"); setQuery(""); }
+    else { setQuery((prev) => prev === tag ? "" : tag); setMinPrice(""); setMaxPrice(""); }
+  };
+
+  const activeTag = POPULAR_TAGS.find((t) => {
+    if (t === "Under 50K") return maxPrice === "50000" && !minPrice && !query;
+    if (t === "Under 100K") return maxPrice === "100000" && !minPrice && !query;
+    return query === t;
+  });
 
   useSEO({
     title: "All PUBG Mobile Accounts for Sale",
@@ -176,6 +190,28 @@ export function AccountsHub() {
                 <X className="w-4 h-4" />
               </button>
             )}
+          </div>
+        )}
+
+        {/* Popular tags */}
+        {!isLoading && active.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-5">
+            {POPULAR_TAGS.map((tag) => {
+              const isActive = activeTag === tag;
+              return (
+                <button
+                  key={tag}
+                  onClick={() => applyTag(tag)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                    isActive
+                      ? "bg-orange-500 border-orange-500 text-white"
+                      : "bg-[#0D1117] border-[#1E293B] text-slate-400 hover:border-orange-500/40 hover:text-slate-200"
+                  }`}
+                >
+                  {tag}
+                </button>
+              );
+            })}
           </div>
         )}
 
