@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Star, ShieldCheck, MessageCircle, LogIn, UserPlus } from "lucide-react";
+import { Star, ShieldCheck, MessageCircle, LogIn, UserPlus, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { useAccountReviews } from "@/hooks/use-account-reviews";
@@ -19,8 +19,7 @@ function StarRating({
   onRate?: (r: number) => void;
 }) {
   const [hovered, setHovered] = useState(0);
-  const sz =
-    size === "sm" ? "w-4 h-4" : size === "md" ? "w-5 h-5" : "w-8 h-8";
+  const sz = size === "sm" ? "w-4 h-4" : size === "md" ? "w-5 h-5" : "w-8 h-8";
   const display = interactive ? hovered || rating : rating;
   return (
     <div className="flex items-center gap-1">
@@ -28,9 +27,7 @@ function StarRating({
         <Star
           key={n}
           className={`${sz} transition-colors ${
-            n <= display
-              ? "fill-yellow-400 text-yellow-400"
-              : "fill-transparent text-slate-600"
+            n <= display ? "fill-yellow-400 text-yellow-400" : "fill-transparent text-slate-600"
           } ${interactive ? "cursor-pointer hover:scale-110 transition-transform" : ""}`}
           onMouseEnter={interactive ? () => setHovered(n) : undefined}
           onMouseLeave={interactive ? () => setHovered(0) : undefined}
@@ -50,23 +47,15 @@ export function ReviewSection({ accountId }: { accountId: number }) {
 
   const [rating, setRating] = useState(0);
   const [text, setText] = useState("");
+  const [submitted, setSubmitted] = useState(false);
 
   const submitMutation = useMutation({
-    mutationFn: async ({
-      rating,
-      reviewText,
-    }: {
-      rating: number;
-      reviewText: string;
-    }) => {
+    mutationFn: async ({ rating, reviewText }: { rating: number; reviewText: string }) => {
       const res = await fetch(`/api/accounts/${accountId}/reviews`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rating,
-          reviewText: reviewText.trim() || undefined,
-        }),
+        body: JSON.stringify({ rating, reviewText: reviewText.trim() || undefined }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -78,17 +67,10 @@ export function ReviewSection({ accountId }: { accountId: number }) {
       queryClient.invalidateQueries({ queryKey: ["reviews", accountId] });
       setRating(0);
       setText("");
-      toast({
-        title: "Review submitted!",
-        description: "Your review is pending admin approval.",
-      });
+      setSubmitted(true);
     },
     onError: (err: any) => {
-      toast({
-        title: "Failed to submit",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast({ title: "Failed to submit", description: err.message, variant: "destructive" });
     },
   });
 
@@ -106,7 +88,6 @@ export function ReviewSection({ accountId }: { accountId: number }) {
     aggregateRating,
     canReview,
     hasReviewed,
-    myReview,
     isLoggedIn = false,
   } = data ?? {};
 
@@ -114,8 +95,6 @@ export function ReviewSection({ accountId }: { accountId: number }) {
 
   return (
     <div className="space-y-4">
-
-      {/* ══ WRITE A REVIEW — always first, prominent ══════════════════════════ */}
 
       {/* Loading skeleton */}
       {isLoading && (
@@ -125,28 +104,30 @@ export function ReviewSection({ accountId }: { accountId: number }) {
         </div>
       )}
 
+      {/* Submitted confirmation — no "pending" language */}
+      {submitted && (
+        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 flex items-center gap-3">
+          <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-emerald-300">Review submitted!</p>
+            <p className="text-xs text-slate-400 mt-0.5">Thank you for your feedback.</p>
+          </div>
+        </div>
+      )}
+
       {/* Logged-in user who can review → show form */}
-      {!isLoading && canReview && (
+      {!isLoading && canReview && !submitted && (
         <div className="bg-[#11151E] border border-orange-500/30 rounded-2xl p-5">
           <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
             <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
             Rate this account
           </h3>
-          <p className="text-xs text-slate-400 mb-4">
-            Tap a star to rate, then optionally write a review.
-          </p>
+          <p className="text-xs text-slate-400 mb-4">Tap a star to rate, then optionally write a review.</p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <StarRating
-                rating={rating}
-                size="lg"
-                interactive
-                onRate={setRating}
-              />
+              <StarRating rating={rating} size="lg" interactive onRate={setRating} />
               {rating > 0 && (
-                <p className="text-xs text-orange-400 font-medium mt-1.5">
-                  {labels[rating]}
-                </p>
+                <p className="text-xs text-orange-400 font-medium mt-1.5">{labels[rating]}</p>
               )}
             </div>
             <textarea
@@ -171,45 +152,15 @@ export function ReviewSection({ accountId }: { accountId: number }) {
         </div>
       )}
 
-      {/* Logged-in, no form showing and not loading → something is off, show refresh hint */}
-      {!isLoading && isLoggedIn && !canReview && !hasReviewed && (
-        <div className="bg-[#11151E] border border-[#1E293B] rounded-2xl p-4 text-center">
-          <p className="text-sm text-slate-400">
-            ⭐ Want to rate this account?{" "}
-            <button
-              onClick={() => window.location.reload()}
-              className="text-orange-400 hover:text-orange-300 underline font-medium"
-            >
-              Refresh the page
-            </button>
-          </p>
+      {/* Already reviewed — silent, no pending message */}
+      {!isLoading && hasReviewed && !submitted && (
+        <div className="bg-[#11151E] border border-[#1E293B] rounded-2xl p-4 flex items-center gap-3">
+          <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+          <p className="text-sm text-slate-400">You have already reviewed this account. Thank you!</p>
         </div>
       )}
 
-      {/* Logged-in, already reviewed → pending notice */}
-      {!isLoading && hasReviewed && myReview && (
-        <div className={`border rounded-2xl p-4 flex items-start gap-3 ${
-          myReview.approved
-            ? "bg-emerald-500/5 border-emerald-500/20"
-            : "bg-yellow-500/5 border-yellow-500/20"
-        }`}>
-          <ShieldCheck className={`w-4 h-4 mt-0.5 shrink-0 ${myReview.approved ? "text-emerald-400" : "text-yellow-400"}`} />
-          <div>
-            <p className={`text-sm font-semibold ${myReview.approved ? "text-emerald-300" : "text-yellow-300"}`}>
-              {myReview.approved ? "Your Review is Live" : "Review Pending Approval"}
-            </p>
-            <p className="text-xs text-slate-400 mt-0.5">
-              You rated this account {myReview.rating} star
-              {myReview.rating !== 1 ? "s" : ""}.{" "}
-              {myReview.approved
-                ? "Thank you for your feedback!"
-                : "It will appear publicly once approved by our team."}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Not logged in → Play Store style login/signup prompt */}
+      {/* Not logged in */}
       {!isLoading && !isLoggedIn && (
         <div className="bg-[#11151E] border border-[#1E293B] rounded-2xl p-5">
           <div className="flex items-center gap-3 mb-4">
@@ -220,9 +171,7 @@ export function ReviewSection({ accountId }: { accountId: number }) {
             </div>
             <span className="text-sm text-slate-400 font-medium">Rate this account</span>
           </div>
-          <p className="text-xs text-slate-500 mb-4">
-            Login or create a free account to leave a rating and review.
-          </p>
+          <p className="text-xs text-slate-500 mb-4">Login or create a free account to leave a rating and review.</p>
           <div className="flex gap-2">
             <Link
               href="/login"
@@ -241,23 +190,18 @@ export function ReviewSection({ accountId }: { accountId: number }) {
       )}
 
       {/* ══ REVIEWS LIST ═════════════════════════════════════════════════════ */}
-
       <div className="bg-[#11151E] border border-[#1E293B] rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
             <MessageCircle className="w-3.5 h-3.5" /> Customer Reviews
             {aggregateRating && (
-              <span className="text-slate-600 font-normal normal-case tracking-normal">
-                ({aggregateRating.count})
-              </span>
+              <span className="text-slate-600 font-normal normal-case tracking-normal">({aggregateRating.count})</span>
             )}
           </h2>
           {aggregateRating && (
             <div className="flex items-center gap-1.5">
               <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-              <span className="text-sm font-bold text-white">
-                {aggregateRating.avgRating.toFixed(1)}
-              </span>
+              <span className="text-sm font-bold text-white">{aggregateRating.avgRating.toFixed(1)}</span>
               <span className="text-[11px] text-slate-500">/ 5</span>
             </div>
           )}
@@ -281,9 +225,7 @@ export function ReviewSection({ accountId }: { accountId: number }) {
             })}
           </div>
         ) : (
-          <p className="text-sm text-slate-500 mb-4">
-            No reviews yet — be the first to rate this account!
-          </p>
+          <p className="text-sm text-slate-500 mb-4">No reviews yet — be the first to rate this account!</p>
         )}
 
         {reviews.length > 0 && (
@@ -295,16 +237,14 @@ export function ReviewSection({ accountId }: { accountId: number }) {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-semibold text-white">{review.reviewerName}</span>
                       <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/20">
-                        <ShieldCheck className="w-2.5 h-2.5" /> Verified Customer
+                        <ShieldCheck className="w-2.5 h-2.5" /> Verified
                       </span>
                     </div>
                     <StarRating rating={review.rating} size="sm" />
                   </div>
                   <span className="text-[11px] text-slate-600 shrink-0 ml-3">
                     {new Date(review.createdAt).toLocaleDateString("en-PK", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
+                      day: "numeric", month: "short", year: "numeric",
                     })}
                   </span>
                 </div>

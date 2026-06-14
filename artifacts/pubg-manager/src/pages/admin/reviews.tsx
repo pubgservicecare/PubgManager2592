@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/AdminLayout";
-import { Star, CheckCircle, XCircle, Trash2, MessageCircle, Home } from "lucide-react";
+import { Star, CheckCircle, XCircle, Trash2, MessageCircle, Home, Globe, Gamepad2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface AdminReview {
   id: number;
-  accountId: number;
-  accountTitle: string;
+  accountId: number | null;
+  accountTitle: string | null;
+  reviewType: string;
   customerUserId: number;
   customerName: string;
   customerPhone: string;
@@ -24,30 +25,30 @@ function StarDisplay({ rating }: { rating: number }) {
   return (
     <div className="flex items-center gap-0.5">
       {Array.from({ length: 5 }, (_, i) => i + 1).map((n) => (
-        <Star
-          key={n}
-          className={`w-3 h-3 ${
-            n <= rating
-              ? "fill-yellow-400 text-yellow-400"
-              : "fill-transparent text-slate-600"
-          }`}
-        />
+        <Star key={n} className={`w-3 h-3 ${n <= rating ? "fill-yellow-400 text-yellow-400" : "fill-transparent text-slate-600"}`} />
       ))}
     </div>
   );
 }
 
+type StatusFilter = "all" | "pending" | "approved";
+type TypeFilter = "all" | "account" | "platform";
+
 export function AdminReviews() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [filter, setFilter] = useState<"all" | "pending" | "approved">("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const { data: reviews = [], isLoading } = useQuery<AdminReview[]>({
-    queryKey: ["admin-reviews", filter],
+    queryKey: ["admin-reviews", statusFilter, typeFilter],
     queryFn: async () => {
-      const params = filter !== "all" ? `?status=${filter}` : "";
-      const res = await fetch(`/api/admin/reviews${params}`);
+      const params = new URLSearchParams();
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (typeFilter !== "all") params.set("type", typeFilter);
+      const qs = params.toString();
+      const res = await fetch(`/api/admin/reviews${qs ? `?${qs}` : ""}`);
       if (!res.ok) throw new Error("Failed to fetch reviews");
       return res.json();
     },
@@ -65,15 +66,10 @@ export function AdminReviews() {
     },
     onSuccess: (_, { patch }) => {
       queryClient.invalidateQueries({ queryKey: ["admin-reviews"] });
-      if ("approved" in patch) {
-        toast({ title: patch.approved ? "Review approved ✓" : "Review unapproved" });
-      }
-      if ("featuredOnHome" in patch) {
-        toast({ title: patch.featuredOnHome ? "⭐ Added to Home Page" : "Removed from Home Page" });
-      }
+      if ("approved" in patch) toast({ title: patch.approved ? "Review approved ✓" : "Review unapproved" });
+      if ("featuredOnHome" in patch) toast({ title: patch.featuredOnHome ? "⭐ Added to Home Page" : "Removed from Home Page" });
     },
-    onError: (err: any) =>
-      toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -87,8 +83,7 @@ export function AdminReviews() {
       setDeleteId(null);
       toast({ title: "Review deleted" });
     },
-    onError: (err: any) =>
-      toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const pending = reviews.filter((r) => !r.approved).length;
@@ -98,14 +93,13 @@ export function AdminReviews() {
     <AdminLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <MessageCircle className="w-6 h-6 text-primary" />
-              Customer Reviews
+              <MessageCircle className="w-6 h-6 text-primary" /> Customer Reviews
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Moderate reviews and choose which ones appear on the home page.
+              Moderate account reviews &amp; platform reviews. Feature platform reviews on the home page.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -122,48 +116,69 @@ export function AdminReviews() {
           </div>
         </div>
 
-        {/* Info banner */}
+        {/* Info */}
         <div className="bg-orange-500/5 border border-orange-500/20 rounded-xl p-3 flex items-start gap-3">
           <Home className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
           <p className="text-xs text-slate-400 leading-relaxed">
-            <span className="text-orange-300 font-semibold">Home Page Reviews:</span> Approve a review first, then click the <span className="text-orange-300 font-semibold">🏠 Show on Home</span> button to feature it on the home page. Only featured reviews appear in the "What Customers Say" section.
+            <span className="text-orange-300 font-semibold">Home Page:</span> Only <span className="text-orange-300 font-semibold">Platform Reviews</span> can be featured on the home page. Approve a platform review first, then click "Show on Home".
           </p>
         </div>
 
-        {/* Filter tabs */}
-        <div className="flex gap-2">
-          {(["all", "pending", "approved"] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors capitalize ${
-                filter === f
-                  ? "bg-primary/10 text-primary border border-primary/20"
-                  : "text-muted-foreground hover:bg-secondary"
-              }`}
-            >
-              {f}
-              {f === "pending" && pending > 0 && (
-                <span className="ml-1.5 bg-yellow-500/20 text-yellow-400 text-xs px-1.5 py-0.5 rounded-full">
-                  {pending}
-                </span>
-              )}
-            </button>
-          ))}
+        {/* Filters row */}
+        <div className="flex flex-wrap gap-3">
+          {/* Type filter */}
+          <div className="flex gap-1.5">
+            {([
+              { val: "all", label: "All Types" },
+              { val: "account", label: "Account", Icon: Gamepad2 },
+              { val: "platform", label: "Platform", Icon: Globe },
+            ] as { val: TypeFilter; label: string; Icon?: any }[]).map(({ val, label, Icon }) => (
+              <button
+                key={val}
+                onClick={() => setTypeFilter(val)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                  typeFilter === val
+                    ? "bg-primary/10 text-primary border border-primary/20"
+                    : "text-muted-foreground hover:bg-secondary border border-transparent"
+                }`}
+              >
+                {Icon && <Icon className="w-3.5 h-3.5" />} {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="w-px bg-border self-stretch" />
+
+          {/* Status filter */}
+          <div className="flex gap-1.5">
+            {(["all", "pending", "approved"] as StatusFilter[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setStatusFilter(f)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors capitalize ${
+                  statusFilter === f
+                    ? "bg-primary/10 text-primary border border-primary/20"
+                    : "text-muted-foreground hover:bg-secondary border border-transparent"
+                }`}
+              >
+                {f}
+                {f === "pending" && pending > 0 && (
+                  <span className="ml-1.5 bg-yellow-500/20 text-yellow-400 text-xs px-1.5 py-0.5 rounded-full">{pending}</span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Review list */}
+        {/* List */}
         {isLoading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-28 bg-card rounded-2xl animate-pulse border border-border" />
-            ))}
+            {[1, 2, 3].map((i) => <div key={i} className="h-28 bg-card rounded-2xl animate-pulse border border-border" />)}
           </div>
         ) : reviews.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
             <MessageCircle className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p className="text-sm font-medium">No reviews found.</p>
-            <p className="text-xs mt-1 opacity-60">Reviews appear here after customers submit them.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -171,29 +186,40 @@ export function AdminReviews() {
               <div
                 key={review.id}
                 className={`bg-card border rounded-2xl p-5 transition-colors ${
-                  review.featuredOnHome
-                    ? "border-orange-500/30"
-                    : !review.approved
-                    ? "border-yellow-500/20"
-                    : "border-border"
+                  review.featuredOnHome ? "border-orange-500/30" : !review.approved ? "border-yellow-500/20" : "border-border"
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    {/* Account + status badges */}
+                    {/* Type + Account + Badges */}
                     <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <Link href={`/admin/accounts/${review.accountId}`}>
-                        <span className="text-sm font-semibold text-primary hover:underline truncate max-w-xs cursor-pointer">
-                          {review.accountTitle}
+                      {/* Type badge */}
+                      {review.reviewType === "platform" ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border bg-blue-500/10 text-blue-400 border-blue-500/20">
+                          <Globe className="w-2.5 h-2.5" /> Platform
                         </span>
-                      </Link>
-                      <span
-                        className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
-                          review.approved
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                            : "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
-                        }`}
-                      >
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border bg-purple-500/10 text-purple-400 border-purple-500/20">
+                          <Gamepad2 className="w-2.5 h-2.5" /> Account
+                        </span>
+                      )}
+
+                      {review.accountTitle && review.accountId && (
+                        <Link href={`/admin/accounts/${review.accountId}`}>
+                          <span className="text-sm font-semibold text-primary hover:underline truncate max-w-xs cursor-pointer">
+                            {review.accountTitle}
+                          </span>
+                        </Link>
+                      )}
+                      {review.reviewType === "platform" && !review.accountTitle && (
+                        <span className="text-sm font-semibold text-slate-400">CodexStocks Platform</span>
+                      )}
+
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                        review.approved
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                          : "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
+                      }`}>
                         {review.approved ? "Approved" : "Pending"}
                       </span>
                       {review.featuredOnHome && (
@@ -211,25 +237,21 @@ export function AdminReviews() {
                       <span className="text-xs text-muted-foreground opacity-60">{review.rating}/5</span>
                     </div>
 
-                    {/* Review text */}
                     {review.reviewText && (
                       <p className="text-sm text-muted-foreground leading-relaxed bg-secondary/30 rounded-xl px-3 py-2 mt-1">
                         "{review.reviewText}"
                       </p>
                     )}
 
-                    {/* Date */}
                     <p className="text-[11px] text-muted-foreground/40 mt-2">
                       {new Date(review.createdAt).toLocaleString("en-PK", {
-                        day: "numeric", month: "short", year: "numeric",
-                        hour: "2-digit", minute: "2-digit",
+                        day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
                       })}
                     </p>
                   </div>
 
                   {/* Actions */}
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    {/* Approve / Unapprove */}
                     {!review.approved ? (
                       <button
                         onClick={() => patchMutation.mutate({ id: review.id, patch: { approved: true } })}
@@ -248,8 +270,8 @@ export function AdminReviews() {
                       </button>
                     )}
 
-                    {/* Feature on Home — only for approved reviews */}
-                    {review.approved && (
+                    {/* "Show on Home" only for approved PLATFORM reviews */}
+                    {review.approved && review.reviewType === "platform" && (
                       <button
                         onClick={() => patchMutation.mutate({ id: review.id, patch: { featuredOnHome: !review.featuredOnHome } })}
                         disabled={patchMutation.isPending}
@@ -264,11 +286,9 @@ export function AdminReviews() {
                       </button>
                     )}
 
-                    {/* Delete */}
                     <button
                       onClick={() => setDeleteId(review.id)}
                       className="p-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
-                      title="Delete review"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
