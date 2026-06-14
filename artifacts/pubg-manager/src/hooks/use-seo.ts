@@ -17,6 +17,11 @@ interface SEOReview {
   datePublished: string;
 }
 
+interface SEOFaq {
+  question: string;
+  answer: string;
+}
+
 interface SEOOptions {
   title?: string;
   description?: string;
@@ -28,6 +33,8 @@ interface SEOOptions {
   noindex?: boolean;
   aggregateRating?: SEOAggregateRating | null;
   reviews?: SEOReview[];
+  faqs?: SEOFaq[];
+  isHomepage?: boolean;
 }
 
 const SITE_NAME = "CodexStocks";
@@ -88,11 +95,14 @@ export function useSEO({
   noindex = false,
   aggregateRating,
   reviews,
+  faqs,
+  isHomepage = false,
 }: SEOOptions) {
   const aggKey = aggregateRating
     ? `${aggregateRating.ratingValue}:${aggregateRating.reviewCount}`
     : "none";
   const reviewsKey = reviews?.length ?? 0;
+  const faqsKey = faqs?.length ?? 0;
 
   useEffect(() => {
     const finalTitle = title ? `${title} | ${SITE_NAME}` : DEFAULT_TITLE;
@@ -144,7 +154,10 @@ export function useSEO({
             name: SITE_NAME,
             url: SITE_URL,
           },
-          // Digital delivery — no physical shipment, instant worldwide transfer
+          // Digital delivery — free, instant, no physical shipment.
+          // No shippingDestination restriction = worldwide.
+          // "001" (UN M.49) is NOT ISO 3166-1 alpha-2 — removed to avoid
+          // Google Merchant Listing validation errors.
           shippingDetails: {
             "@type": "OfferShippingDetails",
             shippingRate: {
@@ -152,20 +165,8 @@ export function useSEO({
               value: "0",
               currency: "PKR",
             },
-            shippingDestination: {
-              "@type": "DefinedRegion",
-              addressCountry: "001", // UN M.49 code for "World"
-            },
             deliveryTime: {
               "@type": "ShippingDeliveryTime",
-              businessDays: {
-                "@type": "OpeningHoursSpecification",
-                dayOfWeek: [
-                  "Monday","Tuesday","Wednesday","Thursday",
-                  "Friday","Saturday","Sunday",
-                ],
-              },
-              cutoffTime: "23:59:59Z",
               handlingTime: {
                 "@type": "QuantitativeValue",
                 minValue: 0,
@@ -180,10 +181,12 @@ export function useSEO({
               },
             },
           },
-          // Digital goods cannot be returned after account credentials are transferred
+          // Digital PUBG account credentials are transferred and cannot be
+          // returned once delivered. MerchantReturnNotPermitted is accurate.
+          // applicableCountry uses ISO 3166-1 alpha-2 codes (major markets).
           hasMerchantReturnPolicy: {
             "@type": "MerchantReturnPolicy",
-            applicableCountry: "001",
+            applicableCountry: ["PK", "IN", "US", "AE", "GB", "ID", "BD", "SA", "TR", "DE"],
             returnPolicyCategory:
               "https://schema.org/MerchantReturnNotPermitted",
           },
@@ -231,6 +234,45 @@ export function useSEO({
           item: crumb.url,
         })),
       });
+    } else {
+      removeJsonLd("breadcrumb");
     }
-  }, [title, description, image, canonical, type, price, breadcrumbs, noindex, aggKey, reviewsKey]);
+
+    // FAQPage schema — rich result eligible when ≥1 Q&A provided
+    if (faqs && faqs.length > 0) {
+      setJsonLd("faq", {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: faqs.map((f) => ({
+          "@type": "Question",
+          name: f.question,
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: f.answer,
+          },
+        })),
+      });
+    } else {
+      removeJsonLd("faq");
+    }
+
+    // Organization schema — homepage only, improves Knowledge Graph eligibility
+    if (isHomepage) {
+      setJsonLd("organization", {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        name: SITE_NAME,
+        url: SITE_URL,
+        logo: `${SITE_URL}/favicon.png`,
+        sameAs: [],
+        contactPoint: {
+          "@type": "ContactPoint",
+          contactType: "customer support",
+          availableLanguage: ["English", "Urdu"],
+        },
+      });
+    } else {
+      removeJsonLd("organization");
+    }
+  }, [title, description, image, canonical, type, price, breadcrumbs, noindex, aggKey, reviewsKey, faqsKey, isHomepage]);
 }

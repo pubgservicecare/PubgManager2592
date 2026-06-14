@@ -48,6 +48,8 @@ export function FAQPage() {
   useSEO({
     title: "Frequently Asked Questions",
     description: "Everything you need to know about buying PUBG accounts safely from us.",
+    canonical: "/faq",
+    faqs: FAQS.map((f) => ({ question: f.q, answer: f.a })),
   });
 
   const { data: settings } = useGetSettings();

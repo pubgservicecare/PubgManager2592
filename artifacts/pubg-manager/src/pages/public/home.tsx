@@ -42,6 +42,7 @@ export function PublicHome() {
     title: "Buy & Sell PUBG Mobile Accounts Safely",
     description: "Browse verified PUBG Mobile accounts with mythic skins, X-Suits, Glacier weapons and rare items. Secure transfers, transparent listings, and a buying experience built for trust.",
     canonical: "/",
+    isHomepage: true,
   });
 
   // Show only first 5 accounts
