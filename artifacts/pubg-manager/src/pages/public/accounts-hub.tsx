@@ -77,62 +77,61 @@ export function AccountsHub() {
           </p>
         </header>
 
-        {/* Filter bar */}
+        {/* Filter bar — single row */}
         {!isLoading && active.length > 0 && (
-          <div className="mb-6 space-y-2">
+          <div className="mb-6 flex items-center gap-0 bg-[#0D1117] border border-[#1E293B] rounded-xl overflow-hidden">
             {/* Search */}
-            <div className="relative">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search accounts…"
-                className="w-full bg-[#0D1117] border border-[#1E293B] hover:border-[#334155] focus:border-orange-500/60 rounded-lg pl-10 pr-9 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none transition-colors"
+                className="w-full bg-transparent pl-10 pr-8 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
               />
               {query && (
-                <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
+                <button onClick={() => setQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400 transition-colors">
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
 
-            {/* Price range row */}
-            <div className="flex items-center gap-2 bg-[#0D1117] border border-[#1E293B] rounded-lg px-3 py-2">
+            {/* Divider */}
+            <div className="w-px h-6 bg-[#1E293B] shrink-0" />
+
+            {/* Price range */}
+            <div className="flex items-center gap-1.5 px-3 shrink-0">
               <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-              <span className="text-xs text-slate-500 font-medium shrink-0">Price</span>
-              <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                <div className="relative flex-1 min-w-0">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none font-medium">Rs</span>
-                  <input
-                    type="number"
-                    value={minPrice}
-                    onChange={(e) => setMinPrice(e.target.value)}
-                    placeholder="Min"
-                    min="0"
-                    className="w-full bg-[#11151E] border border-[#1E293B] focus:border-orange-500/50 rounded-md pl-7 pr-2 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-colors min-w-0"
-                  />
-                </div>
-                <span className="text-slate-600 text-xs select-none shrink-0">to</span>
-                <div className="relative flex-1 min-w-0">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none font-medium">Rs</span>
-                  <input
-                    type="number"
-                    value={maxPrice}
-                    onChange={(e) => setMaxPrice(e.target.value)}
-                    placeholder="Max"
-                    min="0"
-                    className="w-full bg-[#11151E] border border-[#1E293B] focus:border-orange-500/50 rounded-md pl-7 pr-2 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-colors min-w-0"
-                  />
-                </div>
-              </div>
-              {hasFilters && (
-                <button onClick={clearAll} title="Clear filters" className="shrink-0 flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 transition-colors font-medium">
-                  <X className="w-3 h-3" />
+              <input
+                type="number"
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
+                placeholder="Min"
+                min="0"
+                className="w-16 bg-transparent py-3 text-xs text-slate-300 placeholder-slate-600 focus:outline-none text-center"
+              />
+              <span className="text-slate-600 text-xs select-none">–</span>
+              <input
+                type="number"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
+                placeholder="Max"
+                min="0"
+                className="w-16 bg-transparent py-3 text-xs text-slate-300 placeholder-slate-600 focus:outline-none text-center"
+              />
+              <span className="text-xs text-slate-600 font-medium">Rs</span>
+            </div>
+
+            {/* Clear button */}
+            {hasFilters && (
+              <>
+                <div className="w-px h-6 bg-[#1E293B] shrink-0" />
+                <button onClick={clearAll} className="px-3 py-3 text-xs text-orange-400 hover:text-orange-300 font-medium transition-colors shrink-0">
                   Clear
                 </button>
-              )}
-            </div>
+              </>
+            )}
           </div>
         )}
 
