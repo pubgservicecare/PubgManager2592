@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { PublicLayout } from "@/components/PublicLayout";
 import { useListAccounts } from "@workspace/api-client-react";
 import { Link } from "wouter";
@@ -27,6 +27,18 @@ export function AccountsHub() {
   const [query, setQuery] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+  const [showRange, setShowRange] = useState(false);
+  const rangeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (rangeRef.current && !rangeRef.current.contains(e.target as Node)) {
+        setShowRange(false);
+      }
+    }
+    if (showRange) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showRange]);
 
   const active = accounts ?? [];
 
@@ -77,10 +89,10 @@ export function AccountsHub() {
           </p>
         </header>
 
-        {/* Filter bar — single row */}
+        {/* Filter bar */}
         {!isLoading && active.length > 0 && (
-          <div className="mb-6 flex items-center gap-0 bg-[#0D1117] border border-[#1E293B] rounded-xl overflow-hidden">
-            {/* Search */}
+          <div className="mb-6 flex items-center gap-2">
+            {/* Search — full width */}
             <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
               <input
@@ -88,49 +100,81 @@ export function AccountsHub() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search accounts…"
-                className="w-full bg-transparent pl-10 pr-8 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
+                className="w-full bg-[#0D1117] border border-[#1E293B] hover:border-[#334155] focus:border-orange-500/50 rounded-xl pl-10 pr-9 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none transition-colors"
               />
               {query && (
-                <button onClick={() => setQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400 transition-colors">
+                <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-300 transition-colors">
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
 
-            {/* Divider */}
-            <div className="w-px h-6 bg-[#1E293B] shrink-0" />
+            {/* Range button + dropdown */}
+            <div ref={rangeRef} className="relative shrink-0">
+              <button
+                onClick={() => setShowRange((v) => !v)}
+                className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                  minPrice || maxPrice
+                    ? "bg-orange-500/10 border-orange-500/50 text-orange-400"
+                    : "bg-[#0D1117] border-[#1E293B] hover:border-[#334155] text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Range</span>
+                {(minPrice || maxPrice) && <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />}
+              </button>
 
-            {/* Price range */}
-            <div className="flex items-center gap-1.5 px-3 shrink-0">
-              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-              <input
-                type="number"
-                value={minPrice}
-                onChange={(e) => setMinPrice(e.target.value)}
-                placeholder="Min"
-                min="0"
-                className="w-16 bg-transparent py-3 text-xs text-slate-300 placeholder-slate-600 focus:outline-none text-center"
-              />
-              <span className="text-slate-600 text-xs select-none">–</span>
-              <input
-                type="number"
-                value={maxPrice}
-                onChange={(e) => setMaxPrice(e.target.value)}
-                placeholder="Max"
-                min="0"
-                className="w-16 bg-transparent py-3 text-xs text-slate-300 placeholder-slate-600 focus:outline-none text-center"
-              />
-              <span className="text-xs text-slate-600 font-medium">Rs</span>
+              {showRange && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-[#0D1117] border border-[#1E293B] rounded-xl shadow-xl shadow-black/40 p-4 z-50">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Price Range (Rs)</p>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex-1">
+                      <label className="text-xs text-slate-500 mb-1 block">Min</label>
+                      <input
+                        type="number"
+                        value={minPrice}
+                        onChange={(e) => setMinPrice(e.target.value)}
+                        placeholder="0"
+                        min="0"
+                        className="w-full bg-[#11151E] border border-[#1E293B] focus:border-orange-500/50 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none transition-colors"
+                      />
+                    </div>
+                    <span className="text-slate-600 mt-5">—</span>
+                    <div className="flex-1">
+                      <label className="text-xs text-slate-500 mb-1 block">Max</label>
+                      <input
+                        type="number"
+                        value={maxPrice}
+                        onChange={(e) => setMaxPrice(e.target.value)}
+                        placeholder="Any"
+                        min="0"
+                        className="w-full bg-[#11151E] border border-[#1E293B] focus:border-orange-500/50 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none transition-colors"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setMinPrice(""); setMaxPrice(""); }}
+                      className="flex-1 py-2 rounded-lg border border-[#1E293B] text-xs text-slate-400 hover:text-slate-200 hover:border-[#334155] transition-colors"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      onClick={() => setShowRange(false)}
+                      className="flex-1 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-xs text-white font-semibold transition-colors"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Clear button */}
+            {/* Clear all — only when active */}
             {hasFilters && (
-              <>
-                <div className="w-px h-6 bg-[#1E293B] shrink-0" />
-                <button onClick={clearAll} className="px-3 py-3 text-xs text-orange-400 hover:text-orange-300 font-medium transition-colors shrink-0">
-                  Clear
-                </button>
-              </>
+              <button onClick={clearAll} className="shrink-0 text-xs text-slate-500 hover:text-orange-400 transition-colors font-medium">
+                <X className="w-4 h-4" />
+              </button>
             )}
           </div>
         )}
