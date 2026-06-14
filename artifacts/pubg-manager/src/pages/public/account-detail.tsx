@@ -260,9 +260,18 @@ export function PublicAccountDetail() {
   const canonicalPath = accountSlug ? `/account/${accountSlug}` : `/account/${id}`;
 
   const { data: allAccounts } = useListAccounts({ status: "active", public: true } as any);
-  const relatedAccounts = (allAccounts ?? [])
-    .filter((a) => a.id !== id)
-    .slice(0, 4);
+  const relatedAccounts = (() => {
+    const pool = (allAccounts ?? []).filter((a) => a.id !== id);
+    const currentPrice = account ? Number(account.priceForSale) : 0;
+    if (currentPrice > 0) {
+      // Sort by price proximity — closest price first
+      return [...pool].sort((a, b) =>
+        Math.abs(Number((a as any).priceForSale) - currentPrice) -
+        Math.abs(Number((b as any).priceForSale) - currentPrice)
+      ).slice(0, 6);
+    }
+    return pool.slice(0, 6);
+  })();
 
   const { data: reviewsData } = useAccountReviews(id && id > 0 ? id : undefined);
 
@@ -562,41 +571,69 @@ export function PublicAccountDetail() {
         </div>
       </div>
 
-      {/* ── More accounts (internal linking + SEO) ───────────────────────────── */}
+      {/* ── Similar Accounts ─────────────────────────────────────────────────── */}
       {relatedAccounts.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 pb-6 pt-2" aria-label="More PUBG accounts for sale">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest">More Accounts</h2>
-            <Link href="/accounts" className="text-xs text-orange-400 hover:text-orange-300 font-medium transition-colors">
-              View all →
+        <section className="max-w-7xl mx-auto px-4 pb-8 pt-2" aria-label="Similar PUBG accounts for sale">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-base font-bold text-white">Similar Accounts</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Based on similar price range</p>
+            </div>
+            <Link href="/accounts" className="text-xs text-orange-400 hover:text-orange-300 font-semibold transition-colors flex items-center gap-1">
+              View all <ChevronRight className="w-3 h-3" />
             </Link>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {relatedAccounts.map((rel) => {
               const relSlug = (rel as any).slug as string | undefined;
               const relHref = relSlug ? `/account/${relSlug}` : `/account/${rel.id}`;
               const relImgs = ((rel as any).imageUrls ?? []) as string[];
+              const relPrice = Number((rel as any).priceForSale);
+              const currentPrice = Number(account.priceForSale);
+              const priceDiffPct = currentPrice > 0
+                ? Math.round(((relPrice - currentPrice) / currentPrice) * 100)
+                : 0;
               return (
                 <Link key={rel.id} href={relHref}>
-                  <article className="group relative overflow-hidden rounded-xl border border-[#1E293B] bg-[#11151E] hover:border-orange-500/30 transition-all cursor-pointer">
+                  <article className="group relative overflow-hidden rounded-xl border border-[#1E293B] bg-[#0D1220] hover:border-orange-500/40 hover:bg-[#111827] transition-all duration-200 cursor-pointer">
+                    {/* Image */}
                     <div className="aspect-[4/3] relative overflow-hidden bg-[#0B0F19]">
                       {relImgs.length > 0 ? (
                         <img
                           src={`/api/storage${relImgs[0]}`}
-                          alt={`${rel.title} — Buy PUBG Account`}
+                          alt={`${rel.title} — PUBG Account for sale`}
                           loading="lazy"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center p-2">
-                          <span className="text-[10px] text-slate-500 font-medium text-center line-clamp-2">{rel.title}</span>
+                          <span className="text-[10px] text-slate-600 font-medium text-center line-clamp-2">{rel.title}</span>
+                        </div>
+                      )}
+                      {/* Verified badge */}
+                      <div className="absolute top-1.5 left-1.5">
+                        <span className="inline-flex items-center gap-0.5 bg-emerald-500/20 backdrop-blur-sm text-emerald-300 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-emerald-500/30">
+                          <ShieldCheck className="w-2 h-2" /> Verified
+                        </span>
+                      </div>
+                      {/* Price diff badge */}
+                      {priceDiffPct !== 0 && Math.abs(priceDiffPct) <= 80 && (
+                        <div className="absolute top-1.5 right-1.5">
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                            priceDiffPct < 0
+                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                              : "bg-slate-700/60 text-slate-400 border border-slate-600/30"
+                          }`}>
+                            {priceDiffPct > 0 ? `+${priceDiffPct}%` : `${priceDiffPct}%`}
+                          </span>
                         </div>
                       )}
                     </div>
+                    {/* Info */}
                     <div className="p-2.5">
-                      <p className="text-[11px] text-slate-400 font-medium line-clamp-1 mb-0.5">{rel.title}</p>
-                      <p className="text-xs font-bold text-orange-400">{formatCurrency((rel as any).priceForSale)}</p>
+                      <p className="text-[11px] text-slate-300 font-medium line-clamp-2 mb-1.5 leading-snug">{rel.title}</p>
+                      <p className="text-sm font-black text-orange-400">{formatCurrency(relPrice)}</p>
                     </div>
                   </article>
                 </Link>
