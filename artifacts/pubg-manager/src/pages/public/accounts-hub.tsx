@@ -25,17 +25,26 @@ function formatCurrency(value: any) {
 export function AccountsHub() {
   const { data: accounts, isLoading } = useListAccounts({ status: "active", public: true } as any);
   const [query, setQuery] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
 
   const active = accounts ?? [];
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return active;
-    return active.filter((a) =>
-      a.title?.toLowerCase().includes(q) ||
-      (a as any).description?.toLowerCase().includes(q)
-    );
-  }, [active, query]);
+    const min = minPrice !== "" ? parseFloat(minPrice) : null;
+    const max = maxPrice !== "" ? parseFloat(maxPrice) : null;
+    return active.filter((a) => {
+      if (q && !(a.title?.toLowerCase().includes(q) || (a as any).description?.toLowerCase().includes(q))) return false;
+      const price = parseFloat(String((a as any).priceForSale ?? 0));
+      if (min !== null && !isNaN(min) && price < min) return false;
+      if (max !== null && !isNaN(max) && price > max) return false;
+      return true;
+    });
+  }, [active, query, minPrice, maxPrice]);
+
+  const hasFilters = query || minPrice || maxPrice;
+  const clearAll = () => { setQuery(""); setMinPrice(""); setMaxPrice(""); };
 
   useSEO({
     title: "All PUBG Mobile Accounts for Sale",
@@ -68,25 +77,58 @@ export function AccountsHub() {
           </p>
         </header>
 
-        {/* Search bar */}
+        {/* Search + Price Filter bar */}
         {!isLoading && active.length > 0 && (
-          <div className="relative mb-6 max-w-lg">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search accounts by name…"
-              className="w-full bg-[#11151E] border border-[#1E293B] hover:border-[#2D3F5E] focus:border-orange-500/50 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none transition-colors"
-            />
-            {query && (
-              <button
-                onClick={() => setQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+          <div className="mb-6 flex flex-col sm:flex-row gap-3">
+            {/* Search */}
+            <div className="relative flex-1 max-w-lg">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search accounts by name…"
+                className="w-full bg-[#11151E] border border-[#1E293B] hover:border-[#2D3F5E] focus:border-orange-500/50 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none transition-colors"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Price range */}
+            <div className="flex items-center gap-2 shrink-0">
+              <input
+                type="number"
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
+                placeholder="Min Rs"
+                min="0"
+                className="w-28 bg-[#11151E] border border-[#1E293B] hover:border-[#2D3F5E] focus:border-orange-500/50 rounded-xl px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none transition-colors"
+              />
+              <span className="text-slate-600 text-sm select-none">—</span>
+              <input
+                type="number"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
+                placeholder="Max Rs"
+                min="0"
+                className="w-28 bg-[#11151E] border border-[#1E293B] hover:border-[#2D3F5E] focus:border-orange-500/50 rounded-xl px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none transition-colors"
+              />
+              {hasFilters && (
+                <button
+                  onClick={clearAll}
+                  title="Clear all filters"
+                  className="ml-1 text-slate-500 hover:text-orange-400 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
