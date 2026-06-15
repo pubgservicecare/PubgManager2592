@@ -47,3 +47,12 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Legacy migration backup — always fails, not needed in repo
+.migration-backup/
+
+# User prompt text files saved by AI assistant — not source code
+attached_assets/
+
+# Local file uploads — use object storage, not git
+artifacts/api-server/uploads/
