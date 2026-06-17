@@ -16,6 +16,8 @@ interface UploadResponse {
 interface UseUploadOptions {
   /** Base path where object storage routes are mounted (default: "/api/storage") */
   basePath?: string;
+  /** Account title used to generate a human-readable filename slug */
+  accountTitle?: string;
   onSuccess?: (response: UploadResponse) => void;
   onError?: (error: Error) => void;
 }
@@ -61,16 +63,18 @@ export function useUpload(options: UseUploadOptions = {}) {
 
   const requestUploadUrl = useCallback(
     async (file: File): Promise<UploadResponse> => {
+      const body: Record<string, unknown> = {
+        name: file.name,
+        size: file.size,
+        contentType: file.type || "application/octet-stream",
+      };
+      if (options.accountTitle) body.accountTitle = options.accountTitle;
       const response = await fetch(`${basePath}/uploads/request-url`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          name: file.name,
-          size: file.size,
-          contentType: file.type || "application/octet-stream",
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {

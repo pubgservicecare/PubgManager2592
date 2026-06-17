@@ -13,4 +13,6 @@ export interface UploadUrlRequest {
   size: number;
   /** @minLength 1 */
   contentType: string;
+  /** Account title used to generate a human-readable filename slug */
+  accountTitle?: string;
 }

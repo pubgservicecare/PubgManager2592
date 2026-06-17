@@ -154,6 +154,7 @@ export function AdminAccountForm() {
               values={imageUrls}
               onChange={setImageUrls}
               max={6}
+              accountTitle={formData.title}
             />
 
             <div className="space-y-2">

@@ -1705,6 +1705,9 @@ components:
         contentType:
           type: string
           minLength: 1
+        accountTitle:
+          type: string
+          description: Account title used to generate a human-readable filename slug
     UploadUrlResponse:
       type: object
       required: [uploadURL, objectPath]

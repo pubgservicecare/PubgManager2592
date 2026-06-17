@@ -15,6 +15,10 @@ export const RequestUploadUrlBody = zod.object({
   name: zod.string().min(1),
   size: zod.number().min(1),
   contentType: zod.string().min(1),
+  accountTitle: zod
+    .string()
+    .optional()
+    .describe("Account title used to generate a human-readable filename slug"),
 });
 
 export const RequestUploadUrlResponse = zod.object({
@@ -25,6 +29,12 @@ export const RequestUploadUrlResponse = zod.object({
       name: zod.string().min(1),
       size: zod.number().min(1),
       contentType: zod.string().min(1),
+      accountTitle: zod
+        .string()
+        .optional()
+        .describe(
+          "Account title used to generate a human-readable filename slug",
+        ),
     })
     .optional(),
 });

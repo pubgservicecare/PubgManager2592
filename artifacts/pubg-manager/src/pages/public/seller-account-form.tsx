@@ -153,6 +153,7 @@ export function SellerAccountForm() {
               values={imageUrls}
               onChange={setImageUrls}
               max={1}
+              accountTitle={form.title}
             />
 
             <div className="space-y-1.5">

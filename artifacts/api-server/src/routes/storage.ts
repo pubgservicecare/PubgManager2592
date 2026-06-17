@@ -29,10 +29,10 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
   }
 
   try {
-    const { name, size, contentType } = parsed.data;
+    const { name, size, contentType, accountTitle } = parsed.data;
     const baseUrl = getBaseUrl(req);
 
-    const uploadURL = await objectStorageService.getObjectEntityUploadURL(baseUrl);
+    const uploadURL = await objectStorageService.getObjectEntityUploadURL(baseUrl, accountTitle);
     const objectPath = await objectStorageService.normalizeObjectEntityPath(uploadURL);
 
     res.json(
@@ -61,7 +61,7 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
 router.put("/storage/uploads/gcs/:uuid", express_raw_middleware, async (req: Request, res: Response) => {
   try {
     const uuid = req.params.uuid as string;
-    if (!uuid || !/^[0-9a-f-]{36}$/i.test(uuid)) {
+    if (!uuid || !/^[a-z0-9]([a-z0-9-]{0,80}[a-z0-9])?$/i.test(uuid)) {
       res.status(400).json({ error: "Invalid upload token" });
       return;
     }
@@ -87,7 +87,7 @@ router.put("/storage/uploads/gcs/:uuid", express_raw_middleware, async (req: Req
 router.put("/storage/uploads/local/:uuid", express_raw_middleware, async (req: Request, res: Response) => {
   try {
     const uuid = req.params.uuid as string;
-    if (!uuid || !/^[0-9a-f-]{36}$/i.test(uuid)) {
+    if (!uuid || !/^[a-z0-9]([a-z0-9-]{0,80}[a-z0-9])?$/i.test(uuid)) {
       res.status(400).json({ error: "Invalid upload token" });
       return;
     }

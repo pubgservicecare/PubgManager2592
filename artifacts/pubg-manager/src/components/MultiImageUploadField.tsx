@@ -8,15 +8,17 @@ interface Props {
   values: string[];
   onChange: (paths: string[]) => void;
   max?: number;
+  accountTitle?: string;
 }
 
 function objectUrl(p: string) {
   return `/api/storage${p}`;
 }
 
-export function MultiImageUploadField({ label = "Images", hint, values, onChange, max = 6 }: Props) {
+export function MultiImageUploadField({ label = "Images", hint, values, onChange, max = 6, accountTitle }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { uploadFile, isUploading, progress, error } = useUpload({
+    accountTitle,
     onSuccess: (resp) => {
       onChange([...(values || []), resp.objectPath]);
     },

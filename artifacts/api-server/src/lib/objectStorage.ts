@@ -3,6 +3,7 @@ import { Readable } from "stream";
 import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
+
 import {
   ObjectAclPolicy,
   ObjectPermission,
@@ -11,6 +12,17 @@ import {
   setObjectAclPolicy,
 } from "./objectAcl";
 import { db, settingsTable } from "@workspace/db";
+
+function toSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 40)
+    .replace(/^-|-$/g, "");
+}
 
 export class ObjectNotFoundError extends Error {
   constructor() {
@@ -233,9 +245,12 @@ export class ObjectStorageService {
    * The UUID is stored temporarily in-memory and resolved to a GCS path
    * when the proxy endpoint receives the file.
    */
-  async getObjectEntityUploadURL(baseUrl: string): Promise<string> {
+  async getObjectEntityUploadURL(baseUrl: string, accountTitle?: string): Promise<string> {
     const isLocal = await this.isLocalStorage();
-    const objectId = randomUUID();
+    const uuid = randomUUID();
+    const shortId = uuid.replace(/-/g, "").slice(0, 8);
+    const slug = accountTitle ? toSlug(accountTitle) : "";
+    const objectId = slug ? `${slug}-${shortId}` : uuid;
     if (isLocal) {
       return `${baseUrl}/api/storage/uploads/local/${objectId}`;
     }
