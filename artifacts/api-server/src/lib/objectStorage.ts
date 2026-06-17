@@ -3,6 +3,7 @@ import { Readable } from "stream";
 import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
+import sharp from "sharp";
 
 import {
   ObjectAclPolicy,
@@ -12,6 +13,39 @@ import {
   setObjectAclPolicy,
 } from "./objectAcl";
 import { db, settingsTable } from "@workspace/db";
+
+const IMAGE_MAX_PX = 1920;
+const IMAGE_QUALITY = 82;
+const COMPRESSIBLE_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/tiff",
+  "image/bmp",
+]);
+
+async function compressImage(
+  data: Buffer,
+  contentType: string,
+): Promise<{ data: Buffer; contentType: string }> {
+  if (!COMPRESSIBLE_TYPES.has(contentType.toLowerCase())) {
+    return { data, contentType };
+  }
+  try {
+    const compressed = await sharp(data)
+      .rotate()
+      .resize(IMAGE_MAX_PX, IMAGE_MAX_PX, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: IMAGE_QUALITY })
+      .toBuffer();
+    return { data: compressed, contentType: "image/webp" };
+  } catch {
+    return { data, contentType };
+  }
+}
 
 function toSlug(title: string): string {
   return title
@@ -267,6 +301,8 @@ export class ObjectStorageService {
     data: Buffer,
     contentType: string,
   ): Promise<string> {
+    const compressed = await compressImage(data, contentType);
+
     const client = await this.getStorageClient();
     const settings = await getStorageSettings();
     const folderPath =
@@ -280,7 +316,7 @@ export class ObjectStorageService {
 
     const bucket = client.bucket(bucketName);
     const file = bucket.file(objectName);
-    await file.save(data, { contentType, resumable: false });
+    await file.save(compressed.data, { contentType: compressed.contentType, resumable: false });
     return `/objects/${objectName}`;
   }
 
@@ -404,6 +440,7 @@ export class ObjectStorageService {
     data: Buffer,
     contentType: string,
   ): Promise<void> {
+    const compressed = await compressImage(data, contentType);
     const uploadDir = getLocalUploadDir();
     const extMap: Record<string, string> = {
       "image/jpeg": ".jpg",
@@ -414,10 +451,10 @@ export class ObjectStorageService {
       "application/pdf": ".pdf",
       "video/mp4": ".mp4",
     };
-    const ext = extMap[contentType] || "";
+    const ext = extMap[compressed.contentType] || "";
     const fileName = uuid + ext;
     const filePath = path.join(uploadDir, fileName);
-    fs.writeFileSync(filePath, data);
+    fs.writeFileSync(filePath, compressed.data);
   }
 
   async trySetObjectEntityAclPolicy(
