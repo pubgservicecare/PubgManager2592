@@ -13,11 +13,25 @@ interface UploadResponse {
   metadata: UploadMetadata;
 }
 
+export interface UploadContext {
+  uploadType?:
+    | "account-image"
+    | "seller-cnic-front"
+    | "seller-cnic-back"
+    | "seller-selfie"
+    | "logo";
+  sellerId?: number;
+  accountId?: number;
+  accountSlug?: string;
+}
+
 interface UseUploadOptions {
   /** Base path where object storage routes are mounted (default: "/api/storage") */
   basePath?: string;
   /** Account title used to generate a human-readable filename slug */
   accountTitle?: string;
+  /** Upload context for organized folder-based GCS paths on future uploads */
+  uploadContext?: UploadContext;
   onSuccess?: (response: UploadResponse) => void;
   onError?: (error: Error) => void;
 }
@@ -69,6 +83,13 @@ export function useUpload(options: UseUploadOptions = {}) {
         contentType: file.type || "application/octet-stream",
       };
       if (options.accountTitle) body.accountTitle = options.accountTitle;
+      if (options.uploadContext) {
+        const { uploadType, sellerId, accountId, accountSlug } = options.uploadContext;
+        if (uploadType) body.uploadType = uploadType;
+        if (sellerId !== undefined) body.sellerId = sellerId;
+        if (accountId !== undefined) body.accountId = accountId;
+        if (accountSlug !== undefined) body.accountSlug = accountSlug;
+      }
       const response = await fetch(`${basePath}/uploads/request-url`, {
         method: "POST",
         headers: {

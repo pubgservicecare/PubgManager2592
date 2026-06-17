@@ -561,18 +561,21 @@ function SellerSignupForm({ prefillName, prefillPhone, onSuccess }: { prefillNam
                       hint="Clear photo of the front of your CNIC"
                       value={cnicFront}
                       onChange={setCnicFront}
+                      uploadContext={{ uploadType: "seller-cnic-front" }}
                     />
                     <FileUploadField
                       label="CNIC Back Photo"
                       hint="Clear photo of the back of your CNIC"
                       value={cnicBack}
                       onChange={setCnicBack}
+                      uploadContext={{ uploadType: "seller-cnic-back" }}
                     />
                     <FileUploadField
                       label="Selfie holding CNIC"
                       hint="Hold your CNIC next to your face — must be clearly visible"
                       value={selfie}
                       onChange={setSelfie}
+                      uploadContext={{ uploadType: "seller-selfie" }}
                     />
                   </form>
                 )}

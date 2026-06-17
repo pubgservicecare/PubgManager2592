@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
-import { useUpload } from "@workspace/object-storage-web";
+import { useUpload, type UploadContext } from "@workspace/object-storage-web";
 
 interface Props {
   label?: string;
@@ -9,16 +9,18 @@ interface Props {
   onChange: (paths: string[]) => void;
   max?: number;
   accountTitle?: string;
+  uploadContext?: UploadContext;
 }
 
 function objectUrl(p: string) {
   return `/api/storage${p}`;
 }
 
-export function MultiImageUploadField({ label = "Images", hint, values, onChange, max = 6, accountTitle }: Props) {
+export function MultiImageUploadField({ label = "Images", hint, values, onChange, max = 6, accountTitle, uploadContext }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { uploadFile, isUploading, progress, error } = useUpload({
     accountTitle,
+    uploadContext,
     onSuccess: (resp) => {
       onChange([...(values || []), resp.objectPath]);
     },

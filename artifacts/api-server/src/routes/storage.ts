@@ -5,7 +5,7 @@ import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
 } from "@workspace/api-zod";
-import { ObjectStorageService, ObjectNotFoundError, GcsNotConfiguredError } from "../lib/objectStorage";
+import { ObjectStorageService, ObjectNotFoundError, GcsNotConfiguredError, type UploadContext } from "../lib/objectStorage";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -111,8 +111,27 @@ router.post(
         return;
       }
 
+      // Optional upload context for organized GCS folder paths (forward-only)
+      const rawBody = req.body as Record<string, unknown>;
+      const uploadType = typeof rawBody.uploadType === "string" ? rawBody.uploadType : undefined;
+      const uploadContext: UploadContext | undefined = uploadType
+        ? {
+            uploadType: uploadType as UploadContext["uploadType"],
+            sellerId:
+              rawBody.sellerId !== undefined ? Number(rawBody.sellerId) : undefined,
+            accountId:
+              rawBody.accountId !== undefined ? Number(rawBody.accountId) : undefined,
+            accountSlug:
+              typeof rawBody.accountSlug === "string" ? rawBody.accountSlug : undefined,
+          }
+        : undefined;
+
       const baseUrl = getBaseUrl(req);
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL(baseUrl, accountTitle);
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL(
+        baseUrl,
+        accountTitle,
+        uploadContext,
+      );
       const objectPath = await objectStorageService.normalizeObjectEntityPath(uploadURL);
 
       res.json(

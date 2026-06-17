@@ -155,6 +155,11 @@ export function AdminAccountForm() {
               onChange={setImageUrls}
               max={6}
               accountTitle={formData.title}
+              uploadContext={{
+                uploadType: "account-image",
+                accountId: isEdit ? accountId : undefined,
+                accountSlug: account?.slug ?? undefined,
+              }}
             />
 
             <div className="space-y-2">

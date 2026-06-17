@@ -154,6 +154,10 @@ export function SellerAccountForm() {
               onChange={setImageUrls}
               max={1}
               accountTitle={form.title}
+              uploadContext={{
+                uploadType: "account-image",
+                accountId: editId ?? undefined,
+              }}
             />
 
             <div className="space-y-1.5">

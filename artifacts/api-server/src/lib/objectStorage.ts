@@ -58,6 +58,88 @@ function toSlug(title: string): string {
     .replace(/^-|-$/g, "");
 }
 
+// ── Upload token map ─────────────────────────────────────────────────────────
+// Maps UUID token → intended GCS path (bucket-relative, no /objects/ prefix).
+// Populated by getObjectEntityUploadURL; consumed by saveGcsObject +
+// normalizeObjectEntityPath. Tokens expire after 30 minutes.
+
+export interface UploadContext {
+  uploadType?:
+    | "account-image"
+    | "seller-cnic-front"
+    | "seller-cnic-back"
+    | "seller-selfie"
+    | "logo";
+  sellerId?: number;
+  accountId?: number;
+  accountSlug?: string;
+}
+
+const _uploadTokens = new Map<string, { gcsPath: string; expiresAt: number }>();
+
+const _tokenPruner = setInterval(
+  () => {
+    const now = Date.now();
+    for (const [k, v] of _uploadTokens) {
+      if (v.expiresAt < now) _uploadTokens.delete(k);
+    }
+  },
+  10 * 60 * 1000,
+);
+if (typeof (_tokenPruner as NodeJS.Timeout).unref === "function") {
+  (_tokenPruner as NodeJS.Timeout).unref();
+}
+
+/**
+ * Builds an organized, root-level GCS path based on upload context.
+ * Paths have NO bucket/folder prefix — they are root-level in the bucket
+ * so existing uploads (which use prefix-based paths) remain untouched.
+ */
+function buildOrganizedGcsPath(
+  shortId: string,
+  accountTitle: string | undefined,
+  context: UploadContext,
+): string {
+  const { uploadType, sellerId, accountId, accountSlug } = context;
+
+  switch (uploadType) {
+    case "logo":
+      return `logo/code-x-stocks-logo-${shortId}`;
+
+    case "account-image": {
+      // accountSlug is already a DB slug — use as-is (don't re-run through toSlug).
+      // accountTitle is a raw human title that needs slugifying.
+      const slug = accountSlug
+        ? accountSlug.slice(0, 40).replace(/^-|-$/g, "")
+        : accountTitle
+          ? toSlug(accountTitle)
+          : shortId;
+      if (accountId) {
+        return `accounts/account-${accountId}-${slug}/thumbnail-${shortId}`;
+      }
+      return `accounts/new-${slug}/thumbnail-${shortId}`;
+    }
+
+    case "seller-cnic-front":
+      return sellerId
+        ? `sellers/pending/seller-${sellerId}/cnic-front-${shortId}`
+        : `sellers/pending/signup-${shortId}/cnic-front`;
+
+    case "seller-cnic-back":
+      return sellerId
+        ? `sellers/pending/seller-${sellerId}/cnic-back-${shortId}`
+        : `sellers/pending/signup-${shortId}/cnic-back`;
+
+    case "seller-selfie":
+      return sellerId
+        ? `sellers/pending/seller-${sellerId}/selfie-${shortId}`
+        : `sellers/pending/signup-${shortId}/selfie`;
+
+    default:
+      return `uploads/${shortId}`;
+  }
+}
+
 export class ObjectNotFoundError extends Error {
   constructor() {
     super("Object not found");
@@ -275,20 +357,38 @@ export class ObjectStorageService {
    * For local storage: returns a direct local upload URL.
    * For GCS: returns a PROXY upload URL (browser → our API → GCS).
    *
-   * Proxy approach avoids signed URL signing issues and GCS CORS entirely.
-   * The UUID is stored temporarily in-memory and resolved to a GCS path
-   * when the proxy endpoint receives the file.
+   * When context.uploadType is provided, registers a UUID token → organized
+   * GCS path mapping so saveGcsObject + normalizeObjectEntityPath can use it.
+   * Existing uploads without context continue to use the legacy slug/UUID path.
    */
-  async getObjectEntityUploadURL(baseUrl: string, accountTitle?: string): Promise<string> {
+  async getObjectEntityUploadURL(
+    baseUrl: string,
+    accountTitle?: string,
+    context?: UploadContext,
+  ): Promise<string> {
     const isLocal = await this.isLocalStorage();
     const uuid = randomUUID();
     const shortId = uuid.replace(/-/g, "").slice(0, 8);
-    const slug = accountTitle ? toSlug(accountTitle) : "";
-    const objectId = slug ? `${slug}-${shortId}` : uuid;
+
     if (isLocal) {
+      const slug = accountTitle ? toSlug(accountTitle) : "";
+      const objectId = slug ? `${slug}-${shortId}` : uuid;
       return `${baseUrl}/api/storage/uploads/local/${objectId}`;
     }
-    // GCS: use proxy endpoint — browser PUTs to our server, server uploads to GCS
+
+    // GCS with organized path context: register token → gcsPath
+    if (context?.uploadType) {
+      const gcsPath = buildOrganizedGcsPath(shortId, accountTitle, context);
+      _uploadTokens.set(uuid, {
+        gcsPath,
+        expiresAt: Date.now() + 30 * 60 * 1000,
+      });
+      return `${baseUrl}/api/storage/uploads/gcs/${uuid}`;
+    }
+
+    // Legacy: slug-based or raw UUID (no token registration)
+    const slug = accountTitle ? toSlug(accountTitle) : "";
+    const objectId = slug ? `${slug}-${shortId}` : uuid;
     return `${baseUrl}/api/storage/uploads/gcs/${objectId}`;
   }
 
@@ -305,18 +405,30 @@ export class ObjectStorageService {
 
     const client = await this.getStorageClient();
     const settings = await getStorageSettings();
-    const folderPath =
-      settings?.gcsFolderPath || settings?.gcsBucketPrivatePath || "";
     const bucketName = settings?.gcsBucketName || "";
     if (!bucketName) throw new GcsNotConfiguredError();
 
-    const objectName = folderPath
-      ? `${folderPath}/uploads/${objectId}`
-      : `uploads/${objectId}`;
+    // Organized path: consume token registered by getObjectEntityUploadURL
+    let objectName: string;
+    const tokenEntry = _uploadTokens.get(objectId);
+    if (tokenEntry) {
+      objectName = tokenEntry.gcsPath;
+      _uploadTokens.delete(objectId);
+    } else {
+      // Legacy: folder prefix + uploads/{objectId}
+      const folderPath =
+        settings?.gcsFolderPath || settings?.gcsBucketPrivatePath || "";
+      objectName = folderPath
+        ? `${folderPath}/uploads/${objectId}`
+        : `uploads/${objectId}`;
+    }
 
     const bucket = client.bucket(bucketName);
     const file = bucket.file(objectName);
-    await file.save(compressed.data, { contentType: compressed.contentType, resumable: false });
+    await file.save(compressed.data, {
+      contentType: compressed.contentType,
+      resumable: false,
+    });
     return `/objects/${objectName}`;
   }
 
@@ -342,16 +454,26 @@ export class ObjectStorageService {
       return `/objects/local/${uuid}`;
     }
 
-    // GCS proxy upload URL → compute the deterministic permanent path from the UUID.
-    // Both request-url and the proxy PUT endpoint use the same formula so they agree.
+    // GCS proxy upload URL → compute the permanent path.
     if (rawPath.includes("/api/storage/uploads/gcs/")) {
-      const uuid = rawPath.split("/api/storage/uploads/gcs/").pop()!.split("?")[0];
+      const token = rawPath
+        .split("/api/storage/uploads/gcs/")
+        .pop()!
+        .split("?")[0];
+
+      // Organized path: token was registered by getObjectEntityUploadURL
+      const tokenEntry = _uploadTokens.get(token);
+      if (tokenEntry) {
+        return `/objects/${tokenEntry.gcsPath}`;
+      }
+
+      // Legacy: derive path from folder settings
       const settings = await getStorageSettings();
       const folderPath =
         settings?.gcsFolderPath || settings?.gcsBucketPrivatePath || "";
       const objectName = folderPath
-        ? `${folderPath}/uploads/${uuid}`
-        : `uploads/${uuid}`;
+        ? `${folderPath}/uploads/${token}`
+        : `uploads/${token}`;
       return `/objects/${objectName}`;
     }
 

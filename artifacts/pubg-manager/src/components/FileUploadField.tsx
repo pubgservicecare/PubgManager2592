@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Upload, Check, X, Image as ImageIcon, Loader2 } from "lucide-react";
-import { useUpload } from "@workspace/object-storage-web";
+import { useUpload, type UploadContext } from "@workspace/object-storage-web";
 
 interface Props {
   label: string;
@@ -9,12 +9,14 @@ interface Props {
   onChange: (objectPath: string | null) => void;
   accept?: string;
   preview?: boolean;
+  uploadContext?: UploadContext;
 }
 
-export function FileUploadField({ label, hint, value, onChange, accept = "image/*", preview = true }: Props) {
+export function FileUploadField({ label, hint, value, onChange, accept = "image/*", preview = true, uploadContext }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(value);
   const inputRef = useRef<HTMLInputElement>(null);
   const { uploadFile, isUploading, progress, error } = useUpload({
+    uploadContext,
     onSuccess: (resp) => {
       onChange(resp.objectPath);
     },

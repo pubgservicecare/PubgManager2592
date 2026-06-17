@@ -335,6 +335,7 @@ export function AdminSettings() {
                   value={form.logoUrl}
                   onChange={(v) => set("logoUrl", v)}
                   accept="image/*"
+                  uploadContext={{ uploadType: "logo" }}
                 />
 
                 <Field label="Site Name" required value={form.siteName} onChange={(v) => set("siteName", v)} />
