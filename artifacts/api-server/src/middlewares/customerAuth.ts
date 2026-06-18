@@ -13,7 +13,7 @@ export function getCustomerSession(req: Request): {
   customerUserId: number;
   customerDbId: number;
   name: string;
-  phone: string;
+  phone: string | null;
 } | null {
   const sess = (req as any).session;
   if (!sess?.customerId) return null;
@@ -21,6 +21,6 @@ export function getCustomerSession(req: Request): {
     customerUserId: sess.customerId,
     customerDbId: sess.customerDbId,
     name: sess.customerName,
-    phone: sess.customerPhone,
+    phone: sess.customerPhone ?? null,
   };
 }

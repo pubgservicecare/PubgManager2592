@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { apiUrl } from "@/lib/api-url";
 import { PublicLayout } from "@/components/PublicLayout";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { useSEO } from "@/hooks/use-seo";
 import { useCustomerAuth } from "@/hooks/use-customer-auth";
 import { useSellerAuth } from "@/hooks/use-seller-auth";
@@ -16,7 +17,7 @@ export function UnifiedLogin() {
   });
 
   const [, setLocation] = useLocation();
-  const { customer, refresh: refreshCustomer } = useCustomerAuth();
+  const { customer, googleClientId, refresh: refreshCustomer, loginWithGoogle } = useCustomerAuth();
   const { refresh: refreshSeller } = useSellerAuth();
 
   const [identifier, setIdentifier] = useState("");
@@ -25,7 +26,6 @@ export function UnifiedLogin() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // If already logged in as customer, bounce to marketplace.
   useEffect(() => {
     if (customer) setLocation("/");
   }, [customer, setLocation]);
@@ -43,12 +43,24 @@ export function UnifiedLogin() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Login failed");
-      // Refresh both auth contexts
       await Promise.all([refreshCustomer(), refreshSeller()]);
       if (data.role === "seller") setLocation("/seller/dashboard");
       else setLocation("/");
     } catch (err: any) {
       setError(err.message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleCredential = async (credential: string) => {
+    setError("");
+    setLoading(true);
+    try {
+      await loginWithGoogle(credential);
+      setLocation("/");
+    } catch (err: any) {
+      setError(err.message || "Google login failed");
     } finally {
       setLoading(false);
     }
@@ -70,7 +82,7 @@ export function UnifiedLogin() {
               Login
             </h1>
             <p className="text-muted-foreground mt-1 text-sm">
-              Use your phone or email to sign in
+              Use your phone, email, or Google to sign in
             </p>
           </div>
 
@@ -79,6 +91,24 @@ export function UnifiedLogin() {
               <div className="flex items-center gap-2 text-destructive bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3 mb-4 text-sm">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{error}</span>
+              </div>
+            )}
+
+            {googleClientId && (
+              <div className="mb-4">
+                <GoogleSignInButton
+                  googleClientId={googleClientId}
+                  onCredential={handleGoogleCredential}
+                  disabled={loading}
+                />
+              </div>
+            )}
+
+            {googleClientId && (
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">or</span>
+                <div className="flex-1 h-px bg-border" />
               </div>
             )}
 

@@ -2,7 +2,10 @@ import { Router, type IRouter } from "express";
 import { eq, sql } from "drizzle-orm";
 import { db, customerUsersTable, customersTable, sellersTable } from "@workspace/db";
 import bcrypt from "bcryptjs";
+import { OAuth2Client } from "google-auth-library";
 import { useSecureCookies, cookieSameSite } from "../app";
+
+const googleAuthClient = new OAuth2Client();
 
 const router: IRouter = Router();
 
@@ -199,6 +202,12 @@ router.post("/customer/login", async (req, res): Promise<void> => {
       return;
     }
 
+    if (!user.passwordHash) {
+      req.log.info({ userId: user.id }, "customer login: account has no password (Google-only account)");
+      res.status(401).json({ error: "This account uses Google Sign-In. Please use 'Continue with Google'." });
+      return;
+    }
+
     // Guard against legacy plaintext values (should not exist in normal flow).
     if (!user.passwordHash.startsWith("$2")) {
       req.log.warn({ userId: user.id }, "customer login: detected non-bcrypt hash, auto-rehashing");
@@ -265,7 +274,8 @@ router.get("/customer/me", async (req, res): Promise<void> => {
       .where(eq(customerUsersTable.id, sess.customerId));
     res.json({
       id: sess.customerId,
-      phone: sess.customerPhone,
+      phone: sess.customerPhone ?? null,
+      email: user?.email ?? null,
       name: sess.customerName,
       customerId: sess.customerDbId,
       referralCode: user?.referralCode ?? null,
@@ -393,6 +403,12 @@ router.post("/auth/login", async (req, res): Promise<void> => {
       );
 
     if (customerUser) {
+      if (!customerUser.passwordHash) {
+        req.log.info({ userId: customerUser.id }, "auth/login: Google-only account attempted phone login");
+        res.status(401).json({ error: "This account uses Google Sign-In. Please use 'Continue with Google'." });
+        return;
+      }
+
       // Guard against legacy plaintext (should not exist in normal operation).
       if (!customerUser.passwordHash.startsWith("$2")) {
         req.log.warn({ userId: customerUser.id }, "auth/login: detected non-bcrypt hash for customer");
@@ -464,11 +480,11 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 router.get("/customer/seller-status", async (req, res): Promise<void> => {
   try {
     const sess = req.session as any;
-    if (!sess.customerId || !sess.customerPhone) {
+    if (!sess.customerId) {
       res.status(401).json({ error: "Not logged in as customer" });
       return;
     }
-    const phoneNorm = normalizePhone(sess.customerPhone);
+    const phoneNorm = normalizePhone(sess.customerPhone ?? "");
     const matches = await db
       .select()
       .from(sellersTable)
@@ -497,11 +513,11 @@ router.get("/customer/seller-status", async (req, res): Promise<void> => {
 router.post("/customer/become-seller", async (req, res): Promise<void> => {
   try {
     const sess = req.session as any;
-    if (!sess.customerId || !sess.customerPhone) {
+    if (!sess.customerId) {
       res.status(401).json({ error: "Not logged in as customer" });
       return;
     }
-    const phoneNorm = normalizePhone(sess.customerPhone);
+    const phoneNorm = normalizePhone(sess.customerPhone ?? "");
     const matches = await db
       .select()
       .from(sellersTable)
@@ -539,6 +555,144 @@ router.post("/customer/become-seller", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "customer/become-seller: unexpected error");
     res.status(500).json({ error: "Failed to process request" });
+  }
+});
+
+// ─── Auth Config (public — returns non-secret config for frontend) ────────────
+
+router.get("/auth/config", (req, res): void => {
+  res.json({
+    googleClientId: process.env.GOOGLE_CLIENT_ID || null,
+  });
+});
+
+// ─── Google OAuth Callback ────────────────────────────────────────────────────
+
+router.post("/auth/google/callback", async (req, res): Promise<void> => {
+  try {
+    const { credential } = req.body;
+    if (!credential || typeof credential !== "string") {
+      res.status(400).json({ error: "credential is required" });
+      return;
+    }
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      res.status(503).json({ error: "Google login is not configured" });
+      return;
+    }
+
+    let ticket;
+    try {
+      ticket = await googleAuthClient.verifyIdToken({ idToken: credential, audience: clientId });
+    } catch (e) {
+      req.log.warn({ err: e }, "google auth: invalid ID token");
+      res.status(401).json({ error: "Invalid Google token" });
+      return;
+    }
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      res.status(401).json({ error: "Invalid Google token payload" });
+      return;
+    }
+
+    const { sub: googleId, email, name: googleName, email_verified } = payload;
+
+    if (!email_verified) {
+      res.status(401).json({ error: "Google account email is not verified" });
+      return;
+    }
+    if (!email || !googleId) {
+      res.status(400).json({ error: "Google account is missing email or ID" });
+      return;
+    }
+
+    // 1. Find by google_id (returning user)
+    let [user] = await db
+      .select()
+      .from(customerUsersTable)
+      .where(eq(customerUsersTable.googleId, googleId));
+
+    if (!user) {
+      // 2. Find by email (link existing phone account)
+      const [byEmail] = await db
+        .select()
+        .from(customerUsersTable)
+        .where(eq(customerUsersTable.email, email));
+
+      if (byEmail) {
+        [user] = await db
+          .update(customerUsersTable)
+          .set({ googleId, emailVerified: true })
+          .where(eq(customerUsersTable.id, byEmail.id))
+          .returning();
+      } else {
+        // 3. New user — create CRM record + auth record
+        const displayName = (googleName || email.split("@")[0]).trim();
+
+        const [customer] = await db
+          .insert(customersTable)
+          .values({ name: displayName, contact: email })
+          .returning();
+
+        if (!customer) {
+          req.log.error("google auth: failed to create customer record");
+          res.status(500).json({ error: "Failed to create account" });
+          return;
+        }
+
+        let myReferralCode = generateReferralCode(displayName);
+        for (let i = 0; i < 5; i++) {
+          const [collision] = await db
+            .select({ id: customerUsersTable.id })
+            .from(customerUsersTable)
+            .where(eq(customerUsersTable.referralCode, myReferralCode))
+            .limit(1);
+          if (!collision) break;
+          myReferralCode = generateReferralCode(displayName);
+        }
+
+        [user] = await db
+          .insert(customerUsersTable)
+          .values({
+            googleId,
+            email,
+            emailVerified: true,
+            authProvider: "google",
+            name: displayName,
+            customerId: customer.id,
+            referralCode: myReferralCode,
+          })
+          .returning();
+      }
+    }
+
+    if (!user) {
+      res.status(500).json({ error: "Failed to create or retrieve account" });
+      return;
+    }
+
+    await regenerateSession(req);
+    const sess = req.session as any;
+    sess.customerId = user.id;
+    sess.customerPhone = user.phone ?? null;
+    sess.customerName = user.name;
+    sess.customerDbId = user.customerId;
+    await saveSession(req);
+
+    req.log.info({ userId: user.id, provider: "google" }, "google auth: login success");
+
+    res.json({
+      id: user.id,
+      phone: user.phone ?? null,
+      email: user.email ?? null,
+      name: user.name,
+      customerId: user.customerId,
+    });
+  } catch (err) {
+    req.log.error({ err }, "google auth: unexpected error");
+    res.status(500).json({ error: "Google login failed, please try again" });
   }
 });
 

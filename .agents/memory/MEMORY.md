@@ -2,3 +2,4 @@
 - [DB connection priority](db-connection.md) — NEON_DATABASE_URL takes priority over DATABASE_URL; SSL auto-enabled for Neon.
 - [Schema changes](schema-changes.md) — Use direct SQL ALTER TABLE, not drizzle-kit push (prompts drop of user_sessions).
 - [GCS organized paths](gcs-organized-paths.md) — Forward-only upload path restructure; token map ties UUID → GCS path; existing DB records untouched.
+- [Google OAuth auth](google-oauth-auth.md) — GIS token flow; customer_users extended; pg migration via node + lib/db/node_modules/pg.

@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { apiUrl } from "@/lib/api-url";
 import { PublicLayout } from "@/components/PublicLayout";
 import { FileUploadField } from "@/components/FileUploadField";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { useSEO } from "@/hooks/use-seo";
 import { useCustomerAuth } from "@/hooks/use-customer-auth";
 import { useSellerAuth } from "@/hooks/use-seller-auth";
@@ -165,7 +166,7 @@ function Step({ n, title, desc }: { n: number; title: string; desc: string }) {
 /* ─── Customer Signup ────────────────────────────────────────────────────── */
 
 function CustomerSignupForm() {
-  const { signup } = useCustomerAuth();
+  const { signup, googleClientId, loginWithGoogle } = useCustomerAuth();
   const [, setLocation] = useLocation();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -196,6 +197,19 @@ function CustomerSignupForm() {
     }
   };
 
+  const handleGoogleCredential = async (credential: string) => {
+    setError("");
+    setLoading(true);
+    try {
+      await loginWithGoogle(credential);
+      setLocation("/");
+    } catch (err: any) {
+      setError(err.message || "Google sign-up failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <PublicLayout>
       <div className="flex-1 flex items-center justify-center p-4">
@@ -213,6 +227,24 @@ function CustomerSignupForm() {
               <div className="flex items-center gap-2 text-destructive bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3 mb-4 text-sm">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 {error}
+              </div>
+            )}
+
+            {googleClientId && (
+              <div className="mb-4">
+                <GoogleSignInButton
+                  googleClientId={googleClientId}
+                  onCredential={handleGoogleCredential}
+                  disabled={loading}
+                />
+              </div>
+            )}
+
+            {googleClientId && (
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">or sign up with phone</span>
+                <div className="flex-1 h-px bg-border" />
               </div>
             )}
 
