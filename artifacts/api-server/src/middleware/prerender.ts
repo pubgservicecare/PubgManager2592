@@ -398,6 +398,38 @@ function renderAccountHtml(req: Request, data: AccountPageData): string {
       availability: "https://schema.org/InStock",
       url: canonicalUrl,
       seller: { "@type": "Organization", name: siteName, url: siteUrl },
+      // Digital delivery — free, instant, no physical shipment.
+      // Matches shippingDetails in use-seo.ts exactly.
+      shippingDetails: {
+        "@type": "OfferShippingDetails",
+        shippingRate: {
+          "@type": "MonetaryAmount",
+          value: "0",
+          currency: "PKR",
+        },
+        deliveryTime: {
+          "@type": "ShippingDeliveryTime",
+          handlingTime: {
+            "@type": "QuantitativeValue",
+            minValue: 0,
+            maxValue: 1,
+            unitCode: "DAY",
+          },
+          transitTime: {
+            "@type": "QuantitativeValue",
+            minValue: 0,
+            maxValue: 0,
+            unitCode: "DAY",
+          },
+        },
+      },
+      // Digital PUBG account credentials cannot be returned once transferred.
+      // MerchantReturnNotPermitted is accurate and matches use-seo.ts exactly.
+      hasMerchantReturnPolicy: {
+        "@type": "MerchantReturnPolicy",
+        applicableCountry: ["PK", "IN", "US", "AE", "GB", "ID", "BD", "SA", "TR", "DE"],
+        returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted",
+      },
     },
   };
 
