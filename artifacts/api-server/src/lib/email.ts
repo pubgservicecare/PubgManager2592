@@ -3,19 +3,44 @@ import { db, emailLogsTable } from "@workspace/db";
 
 // ─── SMTP Setup ───────────────────────────────────────────────────────────────
 
-const smtpConfigured = !!(
-  process.env.SMTP_HOST &&
-  process.env.SMTP_USER &&
-  process.env.SMTP_PASS
-);
+const SMTP_HOST = process.env.SMTP_HOST || "";
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || "587");
+const SMTP_SECURE = process.env.SMTP_PORT === "465";
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+
+const smtpConfigured = !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
 
 let transporter: nodemailer.Transporter | null = null;
 if (smtpConfigured) {
   transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: process.env.SMTP_PORT === "465",
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    // Force IPv4 — smtp.gmail.com resolves to IPv6 (2404:6800:…) in
+    // some hosting environments that have no outbound IPv6 connectivity,
+    // causing ENETUNREACH. Setting family:4 skips IPv6 entirely.
+    family: 4,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  } as any);
+
+  // ── Startup connectivity probe ─────────────────────────────────────────
+  // Runs once at module load. Errors here do NOT crash the server.
+  transporter.verify().then(() => {
+    console.log(
+      "[EMAIL] SMTP transport ready" +
+      ` | host=${SMTP_HOST} port=${SMTP_PORT} secure=${SMTP_SECURE} family=4` +
+      ` | user=***@${SMTP_USER.split("@")[1] ?? "?"}`
+    );
+  }).catch((err: Error & { code?: string; command?: string; responseCode?: number; response?: string }) => {
+    console.error(
+      "[EMAIL] SMTP verify FAILED" +
+      ` | host=${SMTP_HOST} port=${SMTP_PORT} secure=${SMTP_SECURE} family=4` +
+      ` | user=***@${SMTP_USER.split("@")[1] ?? "?"}` +
+      ` | code=${err.code ?? "?"} command=${err.command ?? "?"}` +
+      ` | responseCode=${err.responseCode ?? "?"} response=${err.response ?? "?"}` +
+      ` | message=${err.message}`
+    );
   });
 }
 
@@ -201,27 +226,59 @@ async function sendEmail(opts: {
 }): Promise<void> {
   if (!transporter) {
     console.warn(
-      `\n[EMAIL — DEV MODE] ─────────────────────────────────\n` +
-      `  To:      ${opts.to}\n` +
-      `  Type:    ${opts.type}\n` +
-      `  Subject: ${opts.subject}\n` +
-      `  (Set SMTP_HOST, SMTP_USER, SMTP_PASS to send real emails)\n` +
-      `─────────────────────────────────────────────────────\n`,
+      `[EMAIL] DEV MODE (no transporter)` +
+      ` | type=${opts.type} to=${opts.to} subject="${opts.subject}"` +
+      ` | Set SMTP_HOST+SMTP_USER+SMTP_PASS to enable real sending`,
     );
     logEmail({ ...opts, status: "sent" });
     return;
   }
 
+  const transportMeta =
+    `host=${SMTP_HOST} port=${SMTP_PORT} secure=${SMTP_SECURE} family=4` +
+    ` | user=***@${SMTP_USER.split("@")[1] ?? "?"}`;
+
+  console.log(
+    `[EMAIL] sendMail attempt` +
+    ` | type=${opts.type} to=${opts.to} subject="${opts.subject}"` +
+    ` | ${transportMeta}`,
+  );
+
   try {
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: FROM,
       to: opts.to,
       subject: opts.subject,
       html: opts.html,
     });
+    const msgId: string = (info as any)?.messageId ?? "(none)";
+    const accepted: string[] = (info as any)?.accepted ?? [];
+    const rejected: string[] = (info as any)?.rejected ?? [];
+    console.log(
+      `[EMAIL] sendMail OK` +
+      ` | type=${opts.type} to=${opts.to}` +
+      ` | messageId=${msgId} accepted=${accepted.join(",")} rejected=${rejected.join(",")}` +
+      ` | ${transportMeta}`,
+    );
     logEmail({ ...opts, status: "sent" });
-  } catch (err) {
-    logEmail({ ...opts, status: "failed", error: String(err) });
+  } catch (err: any) {
+    const code: string = err?.code ?? "?";
+    const cmd: string = err?.command ?? "?";
+    const respCode: number | string = err?.responseCode ?? "?";
+    const resp: string = err?.response ?? "?";
+    const msg: string = err?.message ?? String(err);
+    console.error(
+      `[EMAIL] sendMail FAILED` +
+      ` | type=${opts.type} to=${opts.to}` +
+      ` | code=${code} command=${cmd} responseCode=${respCode} response="${resp}"` +
+      ` | message="${msg}"` +
+      ` | ${transportMeta}`,
+    );
+    logEmail({
+      ...opts,
+      status: "failed",
+      error: `code=${code} cmd=${cmd} rc=${respCode} resp="${resp}" msg="${msg}"`,
+    });
     throw err;
   }
 }
