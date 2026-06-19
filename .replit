@@ -118,5 +118,8 @@ ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"
 SAME_ORIGIN_DEPLOYMENT = "true"
 NODE_ENV = "development"
+SMTP_HOST = "smtp.gmail.com"
+SMTP_PORT = "587"
+SMTP_FROM = "CODExSTOCKS <pubg.service.care@gmail.com>"
 
 [userenv.development]
