@@ -19,6 +19,7 @@ import exportsRouter from "./exports";
 import shareRouter from "./share";
 import reviewsRouter from "./reviews";
 import emailAuthRouter from "./emailAuth";
+import emailCampaignsRouter from "./emailCampaigns";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use(exportsRouter);
 router.use(shareRouter);
 router.use(reviewsRouter);
 router.use(emailAuthRouter);
+router.use(emailCampaignsRouter);
 
 export default router;

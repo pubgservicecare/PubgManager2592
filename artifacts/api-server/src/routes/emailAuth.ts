@@ -9,7 +9,7 @@ import {
   passwordResetTokensTable,
 } from "@workspace/db";
 import bcrypt from "bcryptjs";
-import { sendOtpEmail } from "../lib/email";
+import { sendOtpEmail, sendWelcomeEmail, sendPasswordResetDoneEmail } from "../lib/email";
 import { checkRateLimit } from "../lib/rateLimit";
 import { logAuthEvent, getClientIp } from "../lib/authAudit";
 
@@ -254,6 +254,7 @@ router.post("/auth/email-signup/complete", async (req, res): Promise<void> => {
     sess.customerDbId = customer.id;
     await saveSession(req);
 
+    sendWelcomeEmail(emailLower, user.name).catch(() => {});
     await logAuthEvent("email_signup_complete", user.id, getClientIp(req), { email: emailLower });
     req.log.info({ userId: user.id }, "email-signup: complete");
     res.status(201).json({
@@ -344,7 +345,7 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
     const now = new Date();
 
     const [user] = await db
-      .select({ id: customerUsersTable.id })
+      .select({ id: customerUsersTable.id, name: customerUsersTable.name })
       .from(customerUsersTable)
       .where(eq(customerUsersTable.email, emailLower))
       .limit(1);
@@ -405,6 +406,7 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
       sql`DELETE FROM user_sessions WHERE sess::jsonb->>'customerId' = ${String(user.id)}`,
     );
 
+    sendPasswordResetDoneEmail(emailLower, user.name || "there").catch(() => {});
     await logAuthEvent("password_reset_complete", user.id, getClientIp(req));
     req.log.info({ userId: user.id }, "reset-password: success");
     res.json({ success: true });

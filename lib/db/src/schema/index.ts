@@ -13,3 +13,5 @@ export * from "./notifications";
 export * from "./reviews";
 export * from "./passwordResetTokens";
 export * from "./emailVerifications";
+export * from "./emailCampaigns";
+export * from "./emailLogs";

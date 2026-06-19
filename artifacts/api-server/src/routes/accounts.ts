@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, isNull, and, inArray, sql } from "drizzle-orm";
-import { db, accountsTable, accountLinksTable, paymentsTable, customersTable, historyTable, sellersTable } from "@workspace/db";
+import { db, accountsTable, accountLinksTable, paymentsTable, customersTable, historyTable, sellersTable, customerUsersTable } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLog";
+import { sendPurchaseConfirmationEmail } from "../lib/email";
 import { generateUniqueSlug } from "../lib/slugify";
 
 const router: IRouter = Router();
@@ -521,6 +522,24 @@ router.post("/accounts/:id/sell", requireAdmin, async (req, res): Promise<void> 
     targetId: id,
     details: `${account.title} → ${customerName} for ${finalSoldPrice}`,
   });
+
+  // Non-blocking purchase confirmation email
+  db.select({ email: customerUsersTable.email, name: customerUsersTable.name })
+    .from(customerUsersTable)
+    .where(eq(customerUsersTable.customerId, customer.id))
+    .limit(1)
+    .then(([cu]) => {
+      if (cu?.email) {
+        sendPurchaseConfirmationEmail(
+          cu.email,
+          cu.name || customerName,
+          account.title || "PUBG Mobile Account",
+          finalSoldPrice,
+          paymentType,
+        ).catch(() => {});
+      }
+    })
+    .catch(() => {});
 
   res.json(await buildAccountResponse(updated, true));
 });

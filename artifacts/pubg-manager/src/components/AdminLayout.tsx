@@ -13,7 +13,8 @@ import {
   Activity,
   BookOpen,
   Star,
-  ShieldAlert
+  ShieldAlert,
+  Mail
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useGetDashboard } from "@workspace/api-client-react";
@@ -79,6 +80,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       badge: stats?.unreadChatsCount ? stats.unreadChatsCount : null
     },
     { href: "/admin/reviews", label: "Reviews", icon: Star },
+    { href: "/admin/email-center", label: "Email Center", icon: Mail },
     { href: "/admin/activity", label: "Activity Log", icon: Activity },
     { href: "/admin/docs", label: "Docs", icon: BookOpen },
     { href: "/admin/env-check", label: "Env Check", icon: ShieldAlert },

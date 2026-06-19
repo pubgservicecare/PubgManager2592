@@ -115,6 +115,9 @@ const AdminEnvCheck = lazy(() =>
 const AdminReviews = lazy(() =>
   import("@/pages/admin/reviews").then((m) => ({ default: m.AdminReviews }))
 );
+const AdminEmailCenter = lazy(() =>
+  import("@/pages/admin/email-center").then((m) => ({ default: m.AdminEmailCenter }))
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -177,6 +180,7 @@ function Router() {
         <Route path="/admin/env-check" component={AdminEnvCheck} />
         <Route path="/admin/settings" component={AdminSettings} />
         <Route path="/admin/reviews" component={AdminReviews} />
+        <Route path="/admin/email-center" component={AdminEmailCenter} />
 
         <Route component={NotFound} />
       </Switch>

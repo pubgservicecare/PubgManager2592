@@ -7,7 +7,7 @@ import { db, customerUsersTable, customersTable, sellersTable, emailVerification
 import bcrypt from "bcryptjs";
 import { OAuth2Client } from "google-auth-library";
 import { useSecureCookies, cookieSameSite } from "../app";
-import { sendOtpEmail } from "../lib/email";
+import { sendOtpEmail, sendPasswordChangedEmail, sendGoogleLinkedEmail, sendEmailChangedEmail } from "../lib/email";
 
 const googleAuthClient = new OAuth2Client();
 
@@ -797,6 +797,10 @@ router.post("/customer/set-password", async (req, res): Promise<void> => {
       .set({ passwordHash })
       .where(eq(customerUsersTable.id, user.id));
 
+    if (user.email) {
+      sendPasswordChangedEmail(user.email, user.name || "there").catch(() => {});
+    }
+
     req.log.info({ userId: user.id }, "customer: password set/changed");
     res.json({ success: true });
   } catch (err) {
@@ -879,6 +883,7 @@ router.post("/customer/link-google", async (req, res): Promise<void> => {
       .where(eq(customerUsersTable.id, sess.customerId));
 
     await logAuthEvent("google_linked", sess.customerId, getClientIp(req), { email });
+    sendGoogleLinkedEmail(email, sess.customerName || "there", email).catch(() => {});
     req.log.info({ userId: sess.customerId }, "customer: Google account linked");
     res.json({ linked: true, email });
   } catch (err) {
@@ -1025,7 +1030,7 @@ router.post("/customer/update-email/request", async (req, res): Promise<void> =>
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     await db.insert(emailVerificationsTable).values({ email: emailLower, otpHash, expiresAt });
-    await sendOtpEmail(emailLower, otp, "signup");
+    await sendOtpEmail(emailLower, otp, "email-change");
 
     req.log.info({ userId: sess.customerId, email: emailLower }, "customer: email-update OTP sent");
     res.json({ sent: true });
@@ -1100,6 +1105,7 @@ router.post("/customer/update-email/verify", async (req, res): Promise<void> => 
       .where(eq(customerUsersTable.id, sess.customerId));
 
     await logAuthEvent("email_changed", sess.customerId, getClientIp(req), { newEmail: emailLower });
+    sendEmailChangedEmail(emailLower, sess.customerName || "there", emailLower).catch(() => {});
     req.log.info({ userId: sess.customerId, email: emailLower }, "customer: email updated");
     res.json({ updated: true, email: emailLower });
   } catch (err) {
