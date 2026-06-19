@@ -109,6 +109,9 @@ const AdminActivity = lazy(() =>
 const AdminDocs = lazy(() =>
   import("@/pages/admin/docs").then((m) => ({ default: m.AdminDocs }))
 );
+const AdminEnvCheck = lazy(() =>
+  import("@/pages/admin/env-check").then((m) => ({ default: m.AdminEnvCheck }))
+);
 const AdminReviews = lazy(() =>
   import("@/pages/admin/reviews").then((m) => ({ default: m.AdminReviews }))
 );
@@ -171,6 +174,7 @@ function Router() {
         <Route path="/admin/chat" component={AdminChat} />
         <Route path="/admin/activity" component={AdminActivity} />
         <Route path="/admin/docs" component={AdminDocs} />
+        <Route path="/admin/env-check" component={AdminEnvCheck} />
         <Route path="/admin/settings" component={AdminSettings} />
         <Route path="/admin/reviews" component={AdminReviews} />
 

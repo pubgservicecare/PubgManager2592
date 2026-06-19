@@ -151,4 +151,96 @@ router.post("/settings/test-neon-connection", requireAdmin, async (req, res): Pr
   }
 });
 
+// ─── Env Check — shows status of all required env vars (admin only) ──────────
+
+router.get("/admin/env-check", requireAdmin, (_req, res): void => {
+  const has = (key: string) => !!process.env[key]?.trim();
+
+  res.json({
+    nodeEnv: process.env.NODE_ENV || "development",
+    isProduction: process.env.NODE_ENV === "production",
+    vars: [
+      // ── Critical — app won't work without these ──────────────────────────
+      {
+        key: "NEON_DATABASE_URL",
+        set: has("NEON_DATABASE_URL"),
+        category: "critical",
+        label: "Neon Database URL",
+        description: "Primary Neon PostgreSQL connection string. Takes priority over DATABASE_URL. App won't start without a DB.",
+      },
+      {
+        key: "SESSION_SECRET",
+        set: has("SESSION_SECRET"),
+        category: "critical",
+        label: "Session Secret",
+        description: "Random 32+ character string for signing user sessions. Login will not work without this.",
+      },
+      // ── Feature — needed for specific features ───────────────────────────
+      {
+        key: "GOOGLE_CLIENT_ID",
+        set: has("GOOGLE_CLIENT_ID"),
+        category: "feature",
+        label: "Google Client ID",
+        description: "Enables 'Continue with Google' button on login/signup pages. Get it from Google Cloud Console → Credentials.",
+      },
+      {
+        key: "SITE_URL",
+        set: has("SITE_URL"),
+        category: "feature",
+        label: "Site URL",
+        description: "Canonical domain e.g. https://www.codexstocks.org — used in sitemap.xml and SEO canonical tags.",
+      },
+      {
+        key: "SAME_ORIGIN_DEPLOYMENT",
+        set: has("SAME_ORIGIN_DEPLOYMENT"),
+        category: "feature",
+        label: "Same Origin Deployment",
+        description: "Set to 'true' on Render to fix mobile iOS Safari login. Without it, iPhone users may fail to log in.",
+      },
+      {
+        key: "FRONTEND_URL",
+        set: has("FRONTEND_URL"),
+        category: "feature",
+        label: "Frontend URL (CORS)",
+        description: "Comma-separated allowed CORS origins. Only needed in cross-origin mode (separate frontend + backend domains).",
+      },
+      // ── Optional — for advanced features ────────────────────────────────
+      {
+        key: "GCS_BUCKET",
+        set: has("GCS_BUCKET"),
+        category: "optional",
+        label: "GCS Bucket",
+        description: "Google Cloud Storage bucket name for persistent image storage. Uses local filesystem (lost on redeploy) if not set.",
+      },
+      {
+        key: "GCS_CREDENTIALS",
+        set: has("GCS_CREDENTIALS"),
+        category: "optional",
+        label: "GCS Credentials",
+        description: "Base64-encoded Google Cloud service account JSON. Required for GCS image uploads.",
+      },
+      {
+        key: "DATABASE_URL",
+        set: has("DATABASE_URL"),
+        category: "optional",
+        label: "Database URL (Replit fallback)",
+        description: "Replit-managed PostgreSQL. Used automatically as fallback if NEON_DATABASE_URL is not set.",
+      },
+    ],
+  });
+});
+
+// ─── Test current DB connection (admin only) ──────────────────────────────────
+
+router.get("/admin/test-db-current", requireAdmin, async (_req, res): Promise<void> => {
+  const result = await testDatabaseUrl(
+    process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || "",
+  );
+  if (result.ok) {
+    res.json({ ok: true, message: "✅ Database connection successful — Neon is reachable." });
+  } else {
+    res.status(400).json({ ok: false, error: result.error || "Connection failed." });
+  }
+});
+
 export default router;

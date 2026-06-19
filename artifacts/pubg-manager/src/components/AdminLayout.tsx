@@ -12,7 +12,8 @@ import {
   Store,
   Activity,
   BookOpen,
-  Star
+  Star,
+  ShieldAlert
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useGetDashboard } from "@workspace/api-client-react";
@@ -80,6 +81,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     { href: "/admin/reviews", label: "Reviews", icon: Star },
     { href: "/admin/activity", label: "Activity Log", icon: Activity },
     { href: "/admin/docs", label: "Docs", icon: BookOpen },
+    { href: "/admin/env-check", label: "Env Check", icon: ShieldAlert },
     { href: "/admin/settings", label: "Settings", icon: Settings },
   ];
 
