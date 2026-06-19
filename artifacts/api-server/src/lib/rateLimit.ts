@@ -1,38 +1,45 @@
+import { pool } from "@workspace/db";
+import { logger } from "./logger";
+
 /**
- * WARNING: In-memory rate limiter — counters reset on process restart and are
- * NOT shared across multiple instances. Acceptable for a single-instance
- * Render deployment. For multi-instance or zero-downtime restarts, replace
- * with a Redis/DB-backed limiter.
+ * DB-backed rate limiter using PostgreSQL.
+ *
+ * Benefits over the previous in-memory Map:
+ *   - Persists across server restarts and deploys
+ *   - Consistent across multiple Render instances
+ *   - Atomic upsert prevents race-condition bypass
+ *
+ * Fails OPEN on DB errors (allows the request) to avoid blocking
+ * legitimate users during a DB outage.
  */
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
-
-const store = new Map<string, RateLimitEntry>();
-
-export function checkRateLimit(
+export async function checkRateLimit(
   key: string,
   maxRequests: number,
   windowMs: number,
-): boolean {
-  const now = Date.now();
-  const entry = store.get(key);
-
-  if (!entry || entry.resetAt < now) {
-    store.set(key, { count: 1, resetAt: now + windowMs });
+): Promise<boolean> {
+  const windowSecs = Math.ceil(windowMs / 1000);
+  try {
+    const result = await pool.query<{ count: number; allowed: boolean }>(
+      `INSERT INTO rate_limit_entries (key, count, reset_at)
+       VALUES ($1, 1, NOW() + ($2 || ' seconds')::interval)
+       ON CONFLICT (key) DO UPDATE SET
+         count = CASE
+           WHEN rate_limit_entries.reset_at < NOW() THEN 1
+           ELSE rate_limit_entries.count + 1
+         END,
+         reset_at = CASE
+           WHEN rate_limit_entries.reset_at < NOW()
+             THEN NOW() + ($2 || ' seconds')::interval
+           ELSE rate_limit_entries.reset_at
+         END
+       RETURNING
+         rate_limit_entries.count,
+         (rate_limit_entries.count <= $3) AS allowed`,
+      [key, String(windowSecs), maxRequests],
+    );
+    return result.rows[0]?.allowed ?? true;
+  } catch (err) {
+    logger.warn({ err, key }, "rate-limit: DB error, failing open");
     return true;
   }
-
-  if (entry.count >= maxRequests) return false;
-
-  entry.count++;
-  return true;
 }
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of store) {
-    if (entry.resetAt < now) store.delete(key);
-  }
-}, 5 * 60 * 1000);

@@ -11,6 +11,7 @@ import {
 import bcrypt from "bcryptjs";
 import { sendOtpEmail } from "../lib/email";
 import { checkRateLimit } from "../lib/rateLimit";
+import { logAuthEvent, getClientIp } from "../lib/authAudit";
 
 const router: IRouter = Router();
 
@@ -56,7 +57,8 @@ router.post("/auth/email-signup/request", async (req, res): Promise<void> => {
 
     const emailLower = email.toLowerCase().trim();
 
-    if (!checkRateLimit(`email-signup:${emailLower}`, 3, 30 * 60 * 1000)) {
+    if (!(await checkRateLimit(`email-signup:${emailLower}`, 3, 30 * 60 * 1000))) {
+      await logAuthEvent("email_signup_otp_failed", null, getClientIp(req), { reason: "rate_limited", email: emailLower });
       res.status(429).json({ error: "Too many requests. Please wait 30 minutes." });
       return;
     }
@@ -83,6 +85,7 @@ router.post("/auth/email-signup/request", async (req, res): Promise<void> => {
 
     await sendOtpEmail(emailLower, otp, "signup");
 
+    await logAuthEvent("email_signup_otp_sent", null, getClientIp(req), { email: emailLower });
     req.log.info({ email: emailLower }, "email-signup: OTP sent");
     res.json({ sent: true });
   } catch (err) {
@@ -132,6 +135,7 @@ router.post("/auth/email-signup/verify", async (req, res): Promise<void> => {
       .where(eq(emailVerificationsTable.id, record.id));
 
     if (hashValue(String(otp).trim()) !== record.otpHash) {
+      await logAuthEvent("email_signup_otp_failed", null, getClientIp(req), { email: emailLower, attempt: record.attemptCount + 1 });
       const remaining = 4 - record.attemptCount;
       res.status(400).json({
         error: `Wrong code. ${remaining > 0 ? `${remaining} attempt${remaining === 1 ? "" : "s"} left.` : "Request a new code."}`,
@@ -250,6 +254,7 @@ router.post("/auth/email-signup/complete", async (req, res): Promise<void> => {
     sess.customerDbId = customer.id;
     await saveSession(req);
 
+    await logAuthEvent("email_signup_complete", user.id, getClientIp(req), { email: emailLower });
     req.log.info({ userId: user.id }, "email-signup: complete");
     res.status(201).json({
       id: user.id,
@@ -276,7 +281,8 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
 
     const emailLower = email.toLowerCase().trim();
 
-    if (!checkRateLimit(`forgot:${emailLower}`, 3, 60 * 60 * 1000)) {
+    if (!(await checkRateLimit(`forgot:${emailLower}`, 3, 60 * 60 * 1000))) {
+      await logAuthEvent("forgot_password_requested", null, getClientIp(req), { reason: "rate_limited", email: emailLower });
       res.status(429).json({ error: "Too many requests. Please wait before trying again." });
       return;
     }
@@ -307,6 +313,7 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
       });
 
       await sendOtpEmail(emailLower, otp, "reset");
+      await logAuthEvent("forgot_password_requested", user.id, getClientIp(req), { email: emailLower });
       req.log.info({ userId: user.id }, "forgot-password: OTP sent");
     } else {
       req.log.info({ email: emailLower }, "forgot-password: email not found (silent)");
@@ -375,6 +382,7 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
       .where(eq(passwordResetTokensTable.id, token.id));
 
     if (hashValue(String(otp).trim()) !== token.otpHash) {
+      await logAuthEvent("password_reset_otp_failed", user.id, getClientIp(req), { attempt: token.attemptCount + 1 });
       const remaining = 4 - token.attemptCount;
       res.status(400).json({
         error: `Wrong code. ${remaining > 0 ? `${remaining} attempt${remaining === 1 ? "" : "s"} left.` : "Request a new code."}`,
@@ -397,6 +405,7 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
       sql`DELETE FROM user_sessions WHERE sess::jsonb->>'customerId' = ${String(user.id)}`,
     );
 
+    await logAuthEvent("password_reset_complete", user.id, getClientIp(req));
     req.log.info({ userId: user.id }, "reset-password: success");
     res.json({ success: true });
   } catch (err) {

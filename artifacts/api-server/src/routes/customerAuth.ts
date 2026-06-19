@@ -1,10 +1,13 @@
 import { Router, type IRouter } from "express";
-import { randomBytes } from "crypto";
-import { eq, sql } from "drizzle-orm";
-import { db, customerUsersTable, customersTable, sellersTable } from "@workspace/db";
+import { randomBytes, randomInt, createHash } from "crypto";
+import { eq, sql, and, isNull, gt, desc } from "drizzle-orm";
+import { logAuthEvent, getClientIp } from "../lib/authAudit";
+import { checkRateLimit } from "../lib/rateLimit";
+import { db, customerUsersTable, customersTable, sellersTable, emailVerificationsTable } from "@workspace/db";
 import bcrypt from "bcryptjs";
 import { OAuth2Client } from "google-auth-library";
 import { useSecureCookies, cookieSameSite } from "../app";
+import { sendOtpEmail } from "../lib/email";
 
 const googleAuthClient = new OAuth2Client();
 
@@ -195,9 +198,10 @@ router.post("/customer/login", async (req, res): Promise<void> => {
     const [user] = await db
       .select()
       .from(customerUsersTable)
-      .where(eq(customerUsersTable.phone, phone));
+      .where(and(eq(customerUsersTable.phone, phone), isNull(customerUsersTable.deletedAt)));
 
     if (!user) {
+      await logAuthEvent("login_failure", null, getClientIp(req), { method: "phone" });
       req.log.info({ phone }, "customer login: user not found");
       res.status(401).json({ error: "Invalid number or password" });
       return;
@@ -224,6 +228,7 @@ router.post("/customer/login", async (req, res): Promise<void> => {
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
+      await logAuthEvent("login_failure", user.id, getClientIp(req), { method: "phone", reason: "bad_password" });
       req.log.info({ userId: user.id }, "customer login: password mismatch");
       res.status(401).json({ error: "Invalid number or password" });
       return;
@@ -237,6 +242,7 @@ router.post("/customer/login", async (req, res): Promise<void> => {
     sess.customerDbId = user.customerId;
     await saveSession(req);
 
+    await logAuthEvent("login_success", user.id, getClientIp(req), { method: "phone" });
     req.log.info({ userId: user.id }, "customer login: success");
 
     res.json({
@@ -273,15 +279,22 @@ router.get("/customer/me", async (req, res): Promise<void> => {
       .select()
       .from(customerUsersTable)
       .where(eq(customerUsersTable.id, sess.customerId));
+
+    if (!user || user.deletedAt) {
+      req.session.destroy(() => {});
+      res.status(401).json({ error: "Account not found or has been deleted" });
+      return;
+    }
+
     res.json({
       id: sess.customerId,
       phone: sess.customerPhone ?? null,
-      email: user?.email ?? null,
+      email: user.email ?? null,
       name: sess.customerName,
       customerId: sess.customerDbId,
-      referralCode: user?.referralCode ?? null,
-      hasPassword: !!user?.passwordHash,
-      hasGoogle: !!user?.googleId,
+      referralCode: user.referralCode ?? null,
+      hasPassword: !!user.passwordHash,
+      hasGoogle: !!user.googleId,
     });
   } catch (err) {
     req.log.error({ err }, "customer/me: unexpected error");
@@ -394,7 +407,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
       const [customerByEmail] = await db
         .select()
         .from(customerUsersTable)
-        .where(sql`LOWER(${customerUsersTable.email}) = ${trimmed.toLowerCase()}`)
+        .where(sql`LOWER(${customerUsersTable.email}) = ${trimmed.toLowerCase()} AND ${customerUsersTable.deletedAt} IS NULL`)
         .limit(1);
 
       if (customerByEmail) {
@@ -409,6 +422,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
           return;
         }
         await setCustomerSession(customerByEmail);
+        await logAuthEvent("login_success", customerByEmail.id, getClientIp(req), { method: "email" });
         req.log.info({ userId: customerByEmail.id }, "auth/login: customer email login success");
         res.json({
           role: "customer",
@@ -434,7 +448,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
       .select()
       .from(customerUsersTable)
       .where(
-        sql`regexp_replace(${customerUsersTable.phone}, '[^0-9]', '', 'g') = ${phoneNorm}`,
+        sql`regexp_replace(${customerUsersTable.phone}, '[^0-9]', '', 'g') = ${phoneNorm} AND ${customerUsersTable.deletedAt} IS NULL`,
       );
 
     if (customerUser) {
@@ -454,6 +468,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
       const ok = await bcrypt.compare(password, customerUser.passwordHash);
       if (ok) {
         await setCustomerSession(customerUser);
+        await logAuthEvent("login_success", customerUser.id, getClientIp(req), { method: "phone_unified" });
         req.log.info({ userId: customerUser.id }, "auth/login: customer login success");
         res.json({
           role: "customer",
@@ -718,6 +733,7 @@ router.post("/auth/google/callback", async (req, res): Promise<void> => {
     sess.customerDbId = user.customerId;
     await saveSession(req);
 
+    await logAuthEvent("google_login_success", user.id, getClientIp(req), { isNewAccount });
     req.log.info({ userId: user.id, provider: "google" }, "google auth: login success");
 
     res.json({
@@ -774,6 +790,7 @@ router.post("/customer/set-password", async (req, res): Promise<void> => {
       }
     }
 
+    await logAuthEvent("password_changed", sess.customerId, getClientIp(req));
     const passwordHash = await bcrypt.hash(newPassword, 12);
     await db
       .update(customerUsersTable)
@@ -861,11 +878,233 @@ router.post("/customer/link-google", async (req, res): Promise<void> => {
       .set({ googleId, email, emailVerified: true, authProvider: "google" })
       .where(eq(customerUsersTable.id, sess.customerId));
 
+    await logAuthEvent("google_linked", sess.customerId, getClientIp(req), { email });
     req.log.info({ userId: sess.customerId }, "customer: Google account linked");
     res.json({ linked: true, email });
   } catch (err) {
     req.log.error({ err }, "customer/link-google: error");
     res.status(500).json({ error: "Failed to link Google account. Please try again." });
+  }
+});
+
+// ─── Unlink Google Account ────────────────────────────────────────────────────
+
+router.post("/customer/unlink-google", async (req, res): Promise<void> => {
+  try {
+    const sess = req.session as any;
+    if (!sess.customerId) {
+      res.status(401).json({ error: "Login required" });
+      return;
+    }
+
+    const [user] = await db
+      .select()
+      .from(customerUsersTable)
+      .where(eq(customerUsersTable.id, sess.customerId));
+
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    if (!user.googleId) {
+      res.status(400).json({ error: "No Google account is linked." });
+      return;
+    }
+    if (!user.passwordHash) {
+      res.status(400).json({
+        error: "Set a password first before unlinking Google, otherwise you will lose account access.",
+      });
+      return;
+    }
+
+    await db
+      .update(customerUsersTable)
+      .set({ googleId: null, authProvider: user.phone ? "phone" : "email" })
+      .where(eq(customerUsersTable.id, sess.customerId));
+
+    await logAuthEvent("google_unlinked", sess.customerId, getClientIp(req));
+    req.log.info({ userId: sess.customerId }, "customer: Google account unlinked");
+    res.json({ unlinked: true });
+  } catch (err) {
+    req.log.error({ err }, "customer/unlink-google: error");
+    res.status(500).json({ error: "Failed to unlink Google account. Please try again." });
+  }
+});
+
+// ─── Delete Account (Soft Delete) ────────────────────────────────────────────
+
+router.delete("/customer/account", async (req, res): Promise<void> => {
+  try {
+    const sess = req.session as any;
+    if (!sess.customerId) {
+      res.status(401).json({ error: "Login required" });
+      return;
+    }
+
+    const { password } = req.body || {};
+    const [user] = await db
+      .select()
+      .from(customerUsersTable)
+      .where(eq(customerUsersTable.id, sess.customerId));
+
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    if (user.passwordHash) {
+      if (!password) {
+        res.status(400).json({ error: "Password confirmation required to delete account" });
+        return;
+      }
+      const valid = await bcrypt.compare(password, user.passwordHash);
+      if (!valid) {
+        res.status(401).json({ error: "Incorrect password" });
+        return;
+      }
+    }
+
+    await db
+      .update(customerUsersTable)
+      .set({ deletedAt: new Date() })
+      .where(eq(customerUsersTable.id, sess.customerId));
+
+    await logAuthEvent("account_deleted", sess.customerId, getClientIp(req));
+    req.log.info({ userId: sess.customerId }, "customer: account soft-deleted");
+
+    req.session.destroy(() => {
+      clearSessionCookie(res);
+      res.json({ deleted: true });
+    });
+  } catch (err) {
+    req.log.error({ err }, "customer/account DELETE: error");
+    res.status(500).json({ error: "Failed to delete account. Please try again." });
+  }
+});
+
+// ─── Email Update: Request OTP ────────────────────────────────────────────────
+
+function hashOtp(v: string): string {
+  return createHash("sha256").update(v).digest("hex");
+}
+
+router.post("/customer/update-email/request", async (req, res): Promise<void> => {
+  try {
+    const sess = req.session as any;
+    if (!sess.customerId) {
+      res.status(401).json({ error: "Login required" });
+      return;
+    }
+
+    const { email } = req.body;
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      res.status(400).json({ error: "Valid email address is required" });
+      return;
+    }
+
+    const emailLower = email.toLowerCase().trim();
+
+    if (!(await checkRateLimit(`update-email:${sess.customerId}`, 3, 30 * 60 * 1000))) {
+      res.status(429).json({ error: "Too many requests. Please wait 30 minutes." });
+      return;
+    }
+
+    const [existing] = await db
+      .select({ id: customerUsersTable.id })
+      .from(customerUsersTable)
+      .where(and(eq(customerUsersTable.email, emailLower), isNull(customerUsersTable.deletedAt)))
+      .limit(1);
+
+    if (existing) {
+      res.status(409).json({ error: "This email is already in use by another account." });
+      return;
+    }
+
+    const otp = String(randomInt(100000, 1000000));
+    const otpHash = hashOtp(otp);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await db.insert(emailVerificationsTable).values({ email: emailLower, otpHash, expiresAt });
+    await sendOtpEmail(emailLower, otp, "signup");
+
+    req.log.info({ userId: sess.customerId, email: emailLower }, "customer: email-update OTP sent");
+    res.json({ sent: true });
+  } catch (err) {
+    req.log.error({ err }, "customer/update-email/request: error");
+    res.status(500).json({ error: "Failed to send code. Please try again." });
+  }
+});
+
+// ─── Email Update: Verify OTP ─────────────────────────────────────────────────
+
+router.post("/customer/update-email/verify", async (req, res): Promise<void> => {
+  try {
+    const sess = req.session as any;
+    if (!sess.customerId) {
+      res.status(401).json({ error: "Login required" });
+      return;
+    }
+
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      res.status(400).json({ error: "email and otp are required" });
+      return;
+    }
+
+    const emailLower = email.toLowerCase().trim();
+    const now = new Date();
+
+    const [record] = await db
+      .select()
+      .from(emailVerificationsTable)
+      .where(
+        and(
+          eq(emailVerificationsTable.email, emailLower),
+          isNull(emailVerificationsTable.verifiedAt),
+          gt(emailVerificationsTable.expiresAt, now),
+        ),
+      )
+      .orderBy(desc(emailVerificationsTable.createdAt))
+      .limit(1);
+
+    if (!record) {
+      res.status(400).json({ error: "Code expired or not found. Please request a new one." });
+      return;
+    }
+    if (record.attemptCount >= 5) {
+      res.status(400).json({ error: "Too many wrong attempts. Please request a new code." });
+      return;
+    }
+
+    await db
+      .update(emailVerificationsTable)
+      .set({ attemptCount: record.attemptCount + 1 })
+      .where(eq(emailVerificationsTable.id, record.id));
+
+    if (hashOtp(String(otp).trim()) !== record.otpHash) {
+      const remaining = 4 - record.attemptCount;
+      res.status(400).json({
+        error: `Wrong code. ${remaining > 0 ? `${remaining} attempt${remaining === 1 ? "" : "s"} left.` : "Request a new code."}`,
+      });
+      return;
+    }
+
+    await db
+      .update(emailVerificationsTable)
+      .set({ verifiedAt: new Date() })
+      .where(eq(emailVerificationsTable.id, record.id));
+
+    await db
+      .update(customerUsersTable)
+      .set({ email: emailLower, emailVerified: true })
+      .where(eq(customerUsersTable.id, sess.customerId));
+
+    await logAuthEvent("email_changed", sess.customerId, getClientIp(req), { newEmail: emailLower });
+    req.log.info({ userId: sess.customerId, email: emailLower }, "customer: email updated");
+    res.json({ updated: true, email: emailLower });
+  } catch (err) {
+    req.log.error({ err }, "customer/update-email/verify: error");
+    res.status(500).json({ error: "Email update failed. Please try again." });
   }
 });
 

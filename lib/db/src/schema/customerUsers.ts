@@ -15,6 +15,7 @@ export const customerUsersTable = pgTable("customer_users", {
   authProvider: text("auth_provider").notNull().default("phone"),
   emailVerified: boolean("email_verified").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 export const insertCustomerUserSchema = createInsertSchema(customerUsersTable).omit({ id: true, createdAt: true });
