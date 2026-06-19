@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import dns from "node:dns";
 import { db, emailLogsTable } from "@workspace/db";
 
 // ─── SMTP Setup ───────────────────────────────────────────────────────────────
@@ -17,10 +18,13 @@ if (smtpConfigured) {
     host: SMTP_HOST,
     port: SMTP_PORT,
     secure: SMTP_SECURE,
-    // Force IPv4 — smtp.gmail.com resolves to IPv6 (2404:6800:…) in
-    // some hosting environments that have no outbound IPv6 connectivity,
-    // causing ENETUNREACH. Setting family:4 skips IPv6 entirely.
-    family: 4,
+    // Force IPv4 DNS resolution.
+    // `family:4` is ignored in Node.js 24 on some hosts (Render, etc.) —
+    // smtp.gmail.com still resolves to an IPv6 address causing ENETUNREACH.
+    // Overriding `lookup` intercepts DNS resolution and hard-forces family=4.
+    lookup: (hostname: string, options: dns.LookupOptions, callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void) => {
+      dns.lookup(hostname, { ...options, family: 4 }, callback);
+    },
     auth: { user: SMTP_USER, pass: SMTP_PASS },
   } as any);
 
