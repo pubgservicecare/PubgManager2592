@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, randomInt } from "crypto";
 import { eq, and, gt, isNull, desc, sql } from "drizzle-orm";
 import {
   db,
@@ -15,7 +15,7 @@ import { checkRateLimit } from "../lib/rateLimit";
 const router: IRouter = Router();
 
 function generateOtp(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(randomInt(100000, 1000000));
 }
 
 function hashValue(value: string): string {
@@ -29,7 +29,7 @@ function generateVerificationToken(): { raw: string; hash: string } {
 
 function generateReferralCode(name: string): string {
   const base = name.replace(/[^a-zA-Z0-9]/g, "").slice(0, 4).toUpperCase() || "USER";
-  return `${base}${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+  return `${base}${randomBytes(3).toString("hex").toUpperCase()}`;
 }
 
 function saveSession(req: any): Promise<void> {

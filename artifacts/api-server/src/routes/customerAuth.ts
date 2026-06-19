@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { randomBytes } from "crypto";
 import { eq, sql } from "drizzle-orm";
 import { db, customerUsersTable, customersTable, sellersTable } from "@workspace/db";
 import bcrypt from "bcryptjs";
@@ -29,7 +30,7 @@ function canonicalPhone(s: string): string {
 
 function generateReferralCode(name: string): string {
   const base = name.replace(/[^a-zA-Z0-9]/g, "").slice(0, 4).toUpperCase() || "USER";
-  const rnd = Math.random().toString(36).slice(2, 7).toUpperCase();
+  const rnd = randomBytes(3).toString("hex").toUpperCase();
   return `${base}${rnd}`;
 }
 
@@ -857,7 +858,7 @@ router.post("/customer/link-google", async (req, res): Promise<void> => {
 
     await db
       .update(customerUsersTable)
-      .set({ googleId, email, emailVerified: true })
+      .set({ googleId, email, emailVerified: true, authProvider: "google" })
       .where(eq(customerUsersTable.id, sess.customerId));
 
     req.log.info({ userId: sess.customerId }, "customer: Google account linked");

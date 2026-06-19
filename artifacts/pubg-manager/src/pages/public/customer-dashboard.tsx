@@ -386,7 +386,7 @@ export function CustomerDashboard() {
             <SectionCard title="Account Details" icon={<ShieldCheck className="w-4 h-4 text-primary" />}>
               <div className="space-y-3">
                 <DetailRow label="Full Name" value={customer.name} />
-                <DetailRow label="Phone" value={customer.phone} />
+                {customer.phone && <DetailRow label="Phone" value={customer.phone} />}
                 <DetailRow label="Account Type" value="Customer" />
               </div>
             </SectionCard>

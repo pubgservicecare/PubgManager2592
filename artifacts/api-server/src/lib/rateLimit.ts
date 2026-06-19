@@ -1,3 +1,9 @@
+/**
+ * WARNING: In-memory rate limiter — counters reset on process restart and are
+ * NOT shared across multiple instances. Acceptable for a single-instance
+ * Render deployment. For multi-instance or zero-downtime restarts, replace
+ * with a Redis/DB-backed limiter.
+ */
 interface RateLimitEntry {
   count: number;
   resetAt: number;
