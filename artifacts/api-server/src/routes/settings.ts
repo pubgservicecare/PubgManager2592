@@ -226,6 +226,42 @@ router.get("/admin/env-check", requireAdmin, (_req, res): void => {
         label: "Database URL (Replit fallback)",
         description: "Replit-managed PostgreSQL. Used automatically as fallback if NEON_DATABASE_URL is not set.",
       },
+      // ── Email / SMTP ─────────────────────────────────────────────────────
+      {
+        key: "SMTP_HOST",
+        set: has("SMTP_HOST"),
+        category: "feature",
+        label: "SMTP Host",
+        description: "Email server hostname. Gmail: smtp.gmail.com | Outlook: smtp.office365.com | Hostinger: smtp.hostinger.com",
+      },
+      {
+        key: "SMTP_USER",
+        set: has("SMTP_USER"),
+        category: "feature",
+        label: "SMTP Username",
+        description: "Email account username (usually your full email address e.g. noreply@codexstocks.org).",
+      },
+      {
+        key: "SMTP_PASS",
+        set: has("SMTP_PASS"),
+        category: "feature",
+        label: "SMTP Password / App Password",
+        description: "Email password. For Gmail: use App Password (not your Google account password). Enable 2FA first, then generate at myaccount.google.com/apppasswords.",
+      },
+      {
+        key: "SMTP_PORT",
+        set: has("SMTP_PORT"),
+        category: "optional",
+        label: "SMTP Port",
+        description: "Email server port. Default is 587 (TLS). Use 465 for SSL. Usually not needed unless your host is different.",
+      },
+      {
+        key: "SMTP_FROM",
+        set: has("SMTP_FROM"),
+        category: "optional",
+        label: "SMTP From Address",
+        description: "Sender name shown in emails. Default: CodeX Stocks <noreply@codexstocks.org>",
+      },
     ],
   });
 });

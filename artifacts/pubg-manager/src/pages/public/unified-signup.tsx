@@ -190,7 +190,7 @@ function CustomerSignupForm() {
     setLoading(true);
     try {
       await signup(name, phone, password, referralCode || undefined);
-      setLocation("/my");
+      setLocation("/");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -203,7 +203,7 @@ function CustomerSignupForm() {
     setLoading(true);
     try {
       const { isNewAccount } = await loginWithGoogle(credential);
-      setLocation(isNewAccount ? "/setup-password" : "/my");
+      setLocation(isNewAccount ? "/setup-password" : "/");
     } catch (err: any) {
       setError(err.message || "Google sign-up failed");
     } finally {

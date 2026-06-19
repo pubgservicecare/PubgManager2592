@@ -58,7 +58,7 @@ export function UnifiedLogin() {
     setLoading(true);
     try {
       const { isNewAccount } = await loginWithGoogle(credential);
-      setLocation(isNewAccount ? "/setup-password" : "/my");
+      setLocation(isNewAccount ? "/setup-password" : "/");
     } catch (err: any) {
       setError(err.message || "Google login failed");
     } finally {
