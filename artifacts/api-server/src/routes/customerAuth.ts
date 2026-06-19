@@ -279,6 +279,8 @@ router.get("/customer/me", async (req, res): Promise<void> => {
       name: sess.customerName,
       customerId: sess.customerDbId,
       referralCode: user?.referralCode ?? null,
+      hasPassword: !!user?.passwordHash,
+      hasGoogle: !!user?.googleId,
     });
   } catch (err) {
     req.log.error({ err }, "customer/me: unexpected error");
@@ -387,7 +389,39 @@ router.post("/auth/login", async (req, res): Promise<void> => {
         });
         return;
       }
-      req.log.info({ identifier: trimmed }, "auth/login: seller not found by email");
+      // Also try customer by email
+      const [customerByEmail] = await db
+        .select()
+        .from(customerUsersTable)
+        .where(sql`LOWER(${customerUsersTable.email}) = ${trimmed.toLowerCase()}`)
+        .limit(1);
+
+      if (customerByEmail) {
+        if (!customerByEmail.passwordHash) {
+          res.status(401).json({ error: "This account uses Google Sign-In. Please use 'Continue with Google'." });
+          return;
+        }
+        const ok = await bcrypt.compare(password, customerByEmail.passwordHash);
+        if (!ok) {
+          req.log.info({ userId: customerByEmail.id }, "auth/login: customer email password mismatch");
+          res.status(401).json({ error: "Invalid email or password" });
+          return;
+        }
+        await setCustomerSession(customerByEmail);
+        req.log.info({ userId: customerByEmail.id }, "auth/login: customer email login success");
+        res.json({
+          role: "customer",
+          user: {
+            id: customerByEmail.id,
+            email: customerByEmail.email,
+            name: customerByEmail.name,
+            customerId: customerByEmail.customerId,
+          },
+        });
+        return;
+      }
+
+      req.log.info({ identifier: trimmed }, "auth/login: no account found for email");
       res.status(401).json({ error: "Invalid email or password" });
       return;
     }
@@ -609,6 +643,7 @@ router.post("/auth/google/callback", async (req, res): Promise<void> => {
     }
 
     // 1. Find by google_id (returning user)
+    let isNewAccount = false;
     let [user] = await db
       .select()
       .from(customerUsersTable)
@@ -629,6 +664,7 @@ router.post("/auth/google/callback", async (req, res): Promise<void> => {
           .returning();
       } else {
         // 3. New user — create CRM record + auth record
+        isNewAccount = true;
         const displayName = (googleName || email.split("@")[0]).trim();
 
         const [customer] = await db
@@ -689,10 +725,146 @@ router.post("/auth/google/callback", async (req, res): Promise<void> => {
       email: user.email ?? null,
       name: user.name,
       customerId: user.customerId,
+      isNewAccount,
+      hasPassword: !!user.passwordHash,
+      hasGoogle: true,
     });
   } catch (err) {
     req.log.error({ err }, "google auth: unexpected error");
     res.status(500).json({ error: "Google login failed, please try again" });
+  }
+});
+
+// ─── Set / Change Password ────────────────────────────────────────────────────
+
+router.post("/customer/set-password", async (req, res): Promise<void> => {
+  try {
+    const sess = req.session as any;
+    if (!sess.customerId) {
+      res.status(401).json({ error: "Login required" });
+      return;
+    }
+
+    const { newPassword, currentPassword } = req.body;
+    if (!newPassword || typeof newPassword !== "string" || newPassword.length < 8) {
+      res.status(400).json({ error: "Password must be at least 8 characters" });
+      return;
+    }
+
+    const [user] = await db
+      .select()
+      .from(customerUsersTable)
+      .where(eq(customerUsersTable.id, sess.customerId));
+
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    if (user.passwordHash) {
+      if (!currentPassword) {
+        res.status(400).json({ error: "Current password is required to set a new one" });
+        return;
+      }
+      const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!valid) {
+        res.status(401).json({ error: "Current password is incorrect" });
+        return;
+      }
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await db
+      .update(customerUsersTable)
+      .set({ passwordHash })
+      .where(eq(customerUsersTable.id, user.id));
+
+    req.log.info({ userId: user.id }, "customer: password set/changed");
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "customer/set-password: error");
+    res.status(500).json({ error: "Failed to set password. Please try again." });
+  }
+});
+
+// ─── Link Google Account ──────────────────────────────────────────────────────
+
+router.post("/customer/link-google", async (req, res): Promise<void> => {
+  try {
+    const sess = req.session as any;
+    if (!sess.customerId) {
+      res.status(401).json({ error: "Login required" });
+      return;
+    }
+
+    const { credential } = req.body;
+    if (!credential || typeof credential !== "string") {
+      res.status(400).json({ error: "credential is required" });
+      return;
+    }
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      res.status(503).json({ error: "Google login is not configured" });
+      return;
+    }
+
+    let ticket;
+    try {
+      ticket = await googleAuthClient.verifyIdToken({ idToken: credential, audience: clientId });
+    } catch {
+      res.status(401).json({ error: "Invalid Google token" });
+      return;
+    }
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      res.status(401).json({ error: "Invalid Google token payload" });
+      return;
+    }
+
+    const { sub: googleId, email, email_verified } = payload;
+    if (!email_verified) {
+      res.status(401).json({ error: "Google account email is not verified" });
+      return;
+    }
+    if (!email || !googleId) {
+      res.status(400).json({ error: "Google account missing email or ID" });
+      return;
+    }
+
+    const [byGoogleId] = await db
+      .select({ id: customerUsersTable.id })
+      .from(customerUsersTable)
+      .where(eq(customerUsersTable.googleId, googleId))
+      .limit(1);
+
+    if (byGoogleId && byGoogleId.id !== sess.customerId) {
+      res.status(409).json({ error: "This Google account is already linked to another account." });
+      return;
+    }
+
+    const [byEmail] = await db
+      .select({ id: customerUsersTable.id })
+      .from(customerUsersTable)
+      .where(eq(customerUsersTable.email, email))
+      .limit(1);
+
+    if (byEmail && byEmail.id !== sess.customerId) {
+      res.status(409).json({ error: "This Google email is already used by another account." });
+      return;
+    }
+
+    await db
+      .update(customerUsersTable)
+      .set({ googleId, email, emailVerified: true })
+      .where(eq(customerUsersTable.id, sess.customerId));
+
+    req.log.info({ userId: sess.customerId }, "customer: Google account linked");
+    res.json({ linked: true, email });
+  } catch (err) {
+    req.log.error({ err }, "customer/link-google: error");
+    res.status(500).json({ error: "Failed to link Google account. Please try again." });
   }
 });
 

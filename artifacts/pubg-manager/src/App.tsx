@@ -41,6 +41,15 @@ const CustomerInstallments = lazy(() =>
 const WishlistPage = lazy(() =>
   import("@/pages/public/wishlist").then((m) => ({ default: m.WishlistPage }))
 );
+const ForgotPasswordPage = lazy(() =>
+  import("@/pages/public/forgot-password").then((m) => ({ default: m.ForgotPasswordPage }))
+);
+const SetupPasswordPage = lazy(() =>
+  import("@/pages/public/setup-password").then((m) => ({ default: m.SetupPasswordPage }))
+);
+const CustomerSettingsPage = lazy(() =>
+  import("@/pages/public/customer-settings").then((m) => ({ default: m.CustomerSettingsPage }))
+);
 const FAQPage = lazy(() =>
   import("@/pages/public/faq").then((m) => ({ default: m.FAQPage }))
 );
@@ -135,6 +144,9 @@ function Router() {
         <Route path="/my" component={CustomerDashboard} />
         <Route path="/my/installments" component={CustomerInstallments} />
         <Route path="/my/wishlist" component={WishlistPage} />
+        <Route path="/my/settings" component={CustomerSettingsPage} />
+        <Route path="/forgot-password" component={ForgotPasswordPage} />
+        <Route path="/setup-password" component={SetupPasswordPage} />
         <Route path="/accounts" component={AccountsHub} />
         <Route path="/faq" component={FAQPage} />
         <Route path="/reviews" component={PublicReviews} />

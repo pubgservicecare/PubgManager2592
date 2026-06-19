@@ -8,6 +8,8 @@ interface CustomerUser {
   name: string;
   customerId: number;
   referralCode?: string | null;
+  hasPassword?: boolean;
+  hasGoogle?: boolean;
 }
 
 interface CustomerAuthContext {
@@ -17,7 +19,9 @@ interface CustomerAuthContext {
   refresh: () => Promise<void>;
   signup: (name: string, phone: string, password: string, referralCode?: string) => Promise<void>;
   login: (phone: string, password: string) => Promise<void>;
-  loginWithGoogle: (credential: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<{ isNewAccount: boolean }>;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
+  setPassword: (newPassword: string, currentPassword?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -78,7 +82,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     setCustomer(data);
   };
 
-  const loginWithGoogle = async (credential: string) => {
+  const loginWithGoogle = async (credential: string): Promise<{ isNewAccount: boolean }> => {
     const res = await fetch(apiUrl("/api/auth/google/callback"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -91,6 +95,40 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     }
     const data = await res.json();
     setCustomer(data);
+    return { isNewAccount: data.isNewAccount ?? false };
+  };
+
+  const loginWithEmail = async (email: string, password: string) => {
+    const res = await fetch(apiUrl("/api/auth/login"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ identifier: email.trim(), password }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as any).error || "Login failed");
+    }
+    const data = await res.json();
+    if (data.role === "customer" && data.user) {
+      setCustomer(data.user);
+    } else {
+      throw new Error("This email belongs to a seller account. Please use the seller login.");
+    }
+  };
+
+  const setPassword = async (newPassword: string, currentPassword?: string) => {
+    const res = await fetch(apiUrl("/api/customer/set-password"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ newPassword, currentPassword }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as any).error || "Failed to set password");
+    }
+    await refresh();
   };
 
   const logout = async () => {
@@ -100,7 +138,20 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
 
   return React.createElement(
     CustomerAuthCtx.Provider,
-    { value: { customer, isLoading, googleClientId, refresh, signup, login, loginWithGoogle, logout } },
+    {
+      value: {
+        customer,
+        isLoading,
+        googleClientId,
+        refresh,
+        signup,
+        login,
+        loginWithGoogle,
+        loginWithEmail,
+        setPassword,
+        logout,
+      },
+    },
     children,
   );
 }

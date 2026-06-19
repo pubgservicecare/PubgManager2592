@@ -168,6 +168,7 @@ function Step({ n, title, desc }: { n: number; title: string; desc: string }) {
 function CustomerSignupForm() {
   const { signup, googleClientId, loginWithGoogle } = useCustomerAuth();
   const [, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState<"phone" | "email">("phone");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -182,14 +183,14 @@ function CustomerSignupForm() {
     if (ref) setReferralCode(ref.trim().toUpperCase());
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handlePhoneSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
     setLoading(true);
     try {
       await signup(name, phone, password, referralCode || undefined);
-      setLocation("/");
+      setLocation("/my");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -201,8 +202,8 @@ function CustomerSignupForm() {
     setError("");
     setLoading(true);
     try {
-      await loginWithGoogle(credential);
-      setLocation("/");
+      const { isNewAccount } = await loginWithGoogle(credential);
+      setLocation(isNewAccount ? "/setup-password" : "/my");
     } catch (err: any) {
       setError(err.message || "Google sign-up failed");
     } finally {
@@ -240,47 +241,85 @@ function CustomerSignupForm() {
               </div>
             )}
 
-            {googleClientId && (
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 h-px bg-border" />
-                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">or sign up with phone</span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
-            )}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">or sign up with</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3.5">
-              <InputField icon={User} label="Your Name" type="text" value={name} onChange={setName} placeholder="e.g. Ali Khan" required autoComplete="name" testId="customer-signup-name" />
-              <InputField icon={Phone} label="Phone Number" type="tel" value={phone} onChange={setPhone} placeholder="e.g. 03001234567" required autoComplete="tel" testId="customer-signup-phone" />
-              <div>
-                <InputField
-                  icon={Lock}
-                  label="Password"
-                  type={showPw ? "text" : "password"}
-                  value={password}
-                  onChange={setPassword}
-                  placeholder="At least 6 characters"
-                  required
-                  autoComplete="new-password"
-                  testId="customer-signup-password"
-                  suffix={
-                    <button type="button" onClick={() => setShowPw(!showPw)} className="text-muted-foreground hover:text-white">
-                      {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  }
-                />
-                <p className="text-xs text-muted-foreground mt-1 pl-1">Minimum 6 characters</p>
-              </div>
-              <InputField icon={CheckCircle2} label="Referral Code (optional)" type="text" value={referralCode} onChange={(v) => setReferralCode(v.toUpperCase())} placeholder="Got a code from a friend?" autoComplete="off" testId="customer-signup-referral" />
+            {/* Tab switcher */}
+            <div className="flex gap-1 bg-background/60 rounded-xl p-1 mb-4">
+              {(["phone", "email"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => { setActiveTab(tab); setError(""); }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-bold transition-all ${
+                    activeTab === tab
+                      ? "bg-card text-white shadow-sm"
+                      : "text-muted-foreground hover:text-white"
+                  }`}
+                >
+                  {tab === "phone" ? <Phone className="w-3.5 h-3.5" /> : <Mail className="w-3.5 h-3.5" />}
+                  {tab === "phone" ? "Phone" : "Email"}
+                </button>
+              ))}
+            </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-bold py-3 rounded-xl transition active:scale-[0.98] mt-1"
-                data-testid="customer-signup-submit"
-              >
-                {loading ? "Creating account..." : "Create Account"}
-              </button>
-            </form>
+            <AnimatePresence mode="wait">
+              {activeTab === "phone" ? (
+                <motion.form
+                  key="phone"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ duration: 0.15 }}
+                  onSubmit={handlePhoneSubmit}
+                  className="space-y-3.5"
+                >
+                  <InputField icon={User} label="Your Name" type="text" value={name} onChange={setName} placeholder="e.g. Ali Khan" required autoComplete="name" testId="customer-signup-name" />
+                  <InputField icon={Phone} label="Phone Number" type="tel" value={phone} onChange={setPhone} placeholder="e.g. 03001234567" required autoComplete="tel" testId="customer-signup-phone" />
+                  <div>
+                    <InputField
+                      icon={Lock}
+                      label="Password"
+                      type={showPw ? "text" : "password"}
+                      value={password}
+                      onChange={setPassword}
+                      placeholder="At least 6 characters"
+                      required
+                      autoComplete="new-password"
+                      testId="customer-signup-password"
+                      suffix={
+                        <button type="button" onClick={() => setShowPw(!showPw)} className="text-muted-foreground hover:text-white">
+                          {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground mt-1 pl-1">Minimum 6 characters</p>
+                  </div>
+                  <InputField icon={CheckCircle2} label="Referral Code (optional)" type="text" value={referralCode} onChange={(v) => setReferralCode(v.toUpperCase())} placeholder="Got a code from a friend?" autoComplete="off" testId="customer-signup-referral" />
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-bold py-3 rounded-xl transition active:scale-[0.98] mt-1"
+                    data-testid="customer-signup-submit"
+                  >
+                    {loading ? "Creating account..." : "Create Account"}
+                  </button>
+                </motion.form>
+              ) : (
+                <motion.div
+                  key="email"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <EmailSignupFlow onSuccess={() => setLocation("/my")} />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div className="mt-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-3 py-2.5 text-xs text-emerald-200/90 flex items-start gap-2">
               <Store className="w-3.5 h-3.5 shrink-0 mt-0.5" />
@@ -298,6 +337,171 @@ function CustomerSignupForm() {
         </motion.div>
       </div>
     </PublicLayout>
+  );
+}
+
+/* ─── Email Signup Flow (3-step OTP) ─────────────────────────────────────── */
+
+function EmailSignupFlow({ onSuccess }: { onSuccess: () => void }) {
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [verificationToken, setVerificationToken] = useState("");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const requestOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/email-signup/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to send code");
+      setStep(2);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/email-signup/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), otp: otp.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Verification failed");
+      setVerificationToken(data.verificationToken);
+      setStep(3);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const completeSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/email-signup/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: email.trim(), name: name.trim(), password, verificationToken }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Signup failed");
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <div className="flex items-center gap-2 text-destructive bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3 text-sm">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {/* Step indicator */}
+      <div className="flex items-center justify-center gap-1.5 mb-1">
+        {[1, 2, 3].map((s) => (
+          <div key={s} className={`h-1.5 rounded-full transition-all ${s === step ? "w-6 bg-primary" : s < step ? "w-3 bg-primary/50" : "w-3 bg-border"}`} />
+        ))}
+      </div>
+      <p className="text-xs text-center text-muted-foreground -mt-2">
+        {step === 1 && "Enter your email address"}
+        {step === 2 && `Enter the code sent to ${email}`}
+        {step === 3 && "Set your name and password"}
+      </p>
+
+      <AnimatePresence mode="wait">
+        {step === 1 && (
+          <motion.form key="e1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onSubmit={requestOtp} className="space-y-3">
+            <InputField icon={Mail} label="Email Address" type="email" value={email} onChange={setEmail} placeholder="you@example.com" required autoComplete="email" />
+            <button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-bold py-3 rounded-xl transition">
+              {loading ? "Sending..." : "Send Verification Code"}
+            </button>
+          </motion.form>
+        )}
+
+        {step === 2 && (
+          <motion.form key="e2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onSubmit={verifyOtp} className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-muted-foreground uppercase">6-Digit Code</label>
+              <input
+                required
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                placeholder="123456"
+                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-white text-center text-xl tracking-[0.4em] placeholder:text-muted-foreground placeholder:tracking-normal placeholder:text-base focus:outline-none focus:border-primary"
+              />
+              <p className="text-xs text-muted-foreground text-center">
+                Expires in 10 min.{" "}
+                <button type="button" onClick={() => { setStep(1); setOtp(""); setError(""); }} className="text-primary hover:underline">
+                  Resend
+                </button>
+              </p>
+            </div>
+            <button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-bold py-3 rounded-xl transition">
+              {loading ? "Verifying..." : "Verify Code"}
+            </button>
+          </motion.form>
+        )}
+
+        {step === 3 && (
+          <motion.form key="e3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onSubmit={completeSignup} className="space-y-3">
+            <InputField icon={User} label="Your Name" type="text" value={name} onChange={setName} placeholder="e.g. Ali Khan" required autoComplete="name" />
+            <div>
+              <InputField
+                icon={Lock}
+                label="Password"
+                type={showPw ? "text" : "password"}
+                value={password}
+                onChange={setPassword}
+                placeholder="At least 8 characters"
+                required
+                autoComplete="new-password"
+                suffix={
+                  <button type="button" onClick={() => setShowPw(!showPw)} className="text-muted-foreground hover:text-white">
+                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                }
+              />
+              <p className="text-xs text-muted-foreground mt-1 pl-1">Minimum 8 characters</p>
+            </div>
+            <button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-bold py-3 rounded-xl transition">
+              {loading ? "Creating account..." : "Create Account"}
+            </button>
+          </motion.form>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 

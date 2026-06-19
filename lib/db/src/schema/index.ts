@@ -11,3 +11,5 @@ export * from "./activityLogs";
 export * from "./wishlist";
 export * from "./notifications";
 export * from "./reviews";
+export * from "./passwordResetTokens";
+export * from "./emailVerifications";

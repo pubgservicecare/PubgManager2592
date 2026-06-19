@@ -22,6 +22,7 @@ import {
   Bell,
   ShieldCheck,
   Sparkles,
+  Settings,
 } from "lucide-react";
 import { Link } from "wouter";
 import { formatCurrency } from "@/lib/helpers";
@@ -330,6 +331,15 @@ export function CustomerDashboard() {
                   hoverBorder="hover:border-primary/40"
                   title="Browse Marketplace"
                   subtitle="View all available accounts"
+                />
+                <ActionTile
+                  href="/my/settings"
+                  icon={<Settings className="w-5 h-5" />}
+                  iconColor="text-muted-foreground"
+                  bg="bg-muted/20"
+                  hoverBorder="hover:border-muted-foreground/30"
+                  title="Account Settings"
+                  subtitle="Password, Google link & more"
                 />
               </div>
             </SectionCard>

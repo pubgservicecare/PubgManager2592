@@ -57,8 +57,8 @@ export function UnifiedLogin() {
     setError("");
     setLoading(true);
     try {
-      await loginWithGoogle(credential);
-      setLocation("/");
+      const { isNewAccount } = await loginWithGoogle(credential);
+      setLocation(isNewAccount ? "/setup-password" : "/my");
     } catch (err: any) {
       setError(err.message || "Google login failed");
     } finally {
@@ -135,7 +135,12 @@ export function UnifiedLogin() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-bold text-muted-foreground uppercase">Password</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-muted-foreground uppercase">Password</label>
+                  <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
