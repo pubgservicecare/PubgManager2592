@@ -48,15 +48,10 @@ router.post("/seller/signup", async (req, res): Promise<void> => {
       selfieUrl,
     } = req.body;
 
-    // Phone is taken from the customer session, NOT the request body, so the
-    // resulting seller row stays linked to the same person on the platform.
-    const phone: string | undefined = session.customerPhone;
-    if (!phone) {
-      res.status(401).json({ error: "Customer session is missing phone number. Please log in again." });
-      return;
-    }
+    // Phone is taken from the customer session — optional (email-only accounts may have none).
+    const phone: string | undefined = session.customerPhone || undefined;
 
-    if (!name || !username || !email || !password || !cnicNumber || !cnicFrontUrl || !cnicBackUrl || !selfieUrl) {
+    if (!name || !username || !email || !cnicNumber || !cnicFrontUrl || !cnicBackUrl || !selfieUrl) {
       res.status(400).json({ error: "All fields are required including username, CNIC photos and selfie" });
       return;
     }
@@ -67,7 +62,7 @@ router.post("/seller/signup", async (req, res): Promise<void> => {
       return;
     }
 
-    if (password.length < 6) {
+    if (password && password.length < 6) {
       res.status(400).json({ error: "Password must be at least 6 characters" });
       return;
     }
@@ -115,13 +110,15 @@ router.post("/seller/signup", async (req, res): Promise<void> => {
       return;
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const { randomBytes } = await import("crypto");
+    const rawPassword = password || randomBytes(16).toString("hex");
+    const passwordHash = await bcrypt.hash(rawPassword, 10);
 
     const [seller] = await db.insert(sellersTable).values({
       name: String(name).trim(),
       username: normalizedUsername,
       email: normalizedEmail,
-      phone,
+      phone: phone || null,
       whatsapp: whatsapp || null,
       passwordHash,
       cnicNumber,

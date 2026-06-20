@@ -509,15 +509,13 @@ function EmailSignupFlow({ onSuccess }: { onSuccess: () => void }) {
 /* ─── Seller Signup — 3-Step Wizard ─────────────────────────────────────── */
 
 const STEPS = [
-  { label: "Email",    icon: Mail },
-  { label: "Info",     icon: User },
-  { label: "Password", icon: Lock },
-  { label: "Verify",   icon: IdCard },
+  { label: "Info",   icon: User },
+  { label: "Email",  icon: Mail },
+  { label: "Verify", icon: IdCard },
 ];
 
 function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }: { prefillName: string; prefillPhone: string; prefillEmail: string; onSuccess: () => void }) {
   const [, setLocation] = useLocation();
-  const { refresh: refreshSeller } = useSellerAuth();
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -525,7 +523,6 @@ function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }
 
   // Email OTP state
   const [emailInput, setEmailInput] = useState(prefillEmail || "");
-  const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
   const [emailVerifToken, setEmailVerifToken] = useState("");
@@ -534,22 +531,24 @@ function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }
     name: prefillName || "",
     username: "",
     whatsapp: "",
-    phone: prefillPhone || "",
-    password: "",
-    confirmPassword: "",
     cnicNumber: "",
   });
   const [cnicFront, setCnicFront] = useState<string | null>(null);
   const [cnicBack, setCnicBack] = useState<string | null>(null);
   const [selfie, setSelfie] = useState<string | null>(null);
-  const [showPw, setShowPw] = useState(false);
-  const [showCPw, setShowCPw] = useState(false);
 
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  const requestOtp = async () => {
-    if (!emailInput.trim()) { setErrorMsg("Please enter an email address"); return; }
+  // Step 0 → 1: validate info + send OTP
+  const goNextFromInfo = async () => {
     setErrorMsg("");
+    if (!form.name.trim()) { setErrorMsg("Full name is required"); return; }
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(form.username.trim())) {
+      setErrorMsg("Username: 3-20 characters, letters/numbers/underscore only"); return;
+    }
+    if (!emailInput.trim() || !emailInput.includes("@")) {
+      setErrorMsg("Please enter a valid email address"); return;
+    }
     setOtpLoading(true);
     try {
       const res = await fetch(apiUrl("/api/seller/verify-email/request"), {
@@ -559,8 +558,9 @@ function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to send code");
-      setOtpSent(true);
       setOtpCode("");
+      setDir(1);
+      setStep(1);
     } catch (e: any) {
       setErrorMsg(e.message);
     } finally {
@@ -568,6 +568,7 @@ function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }
     }
   };
 
+  // Step 1: verify OTP → step 2
   const verifyOtp = async () => {
     if (otpCode.length < 6) { setErrorMsg("Please enter the 6-digit code"); return; }
     setErrorMsg("");
@@ -582,31 +583,12 @@ function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }
       if (!res.ok) throw new Error(data.error || "Verification failed");
       setEmailVerifToken(data.verificationToken);
       setDir(1);
-      setStep(1);
+      setStep(2);
     } catch (e: any) {
       setErrorMsg(e.message);
     } finally {
       setOtpLoading(false);
     }
-  };
-
-  const goNext = () => {
-    setErrorMsg("");
-
-    if (step === 1) {
-      if (!form.name.trim()) { setErrorMsg("Full name is required"); return; }
-      if (!/^[a-zA-Z0-9_]{3,20}$/.test(form.username.trim())) {
-        setErrorMsg("Username: 3-20 characters, letters/numbers/underscore only"); return;
-      }
-    }
-
-    if (step === 2) {
-      if (form.password.length < 6) { setErrorMsg("Password must be at least 6 characters"); return; }
-      if (form.password !== form.confirmPassword) { setErrorMsg("Passwords do not match"); return; }
-    }
-
-    setDir(1);
-    setStep((s) => s + 1);
   };
 
   const goBack = () => {
@@ -618,14 +600,12 @@ function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
-
     if (!form.cnicNumber.replace(/\D/g, "").length) {
       setErrorMsg("CNIC number is required"); return;
     }
     if (!cnicFront || !cnicBack || !selfie) {
       setErrorMsg("Please upload CNIC front, back, and selfie"); return;
     }
-
     setSubmitting(true);
     try {
       const res = await fetch(apiUrl("/api/seller/signup"), {
@@ -636,9 +616,7 @@ function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }
           name: form.name,
           username: form.username.trim(),
           email: emailInput.trim(),
-          phone: form.phone,
           whatsapp: form.whatsapp || undefined,
-          password: form.password,
           cnicNumber: form.cnicNumber,
           cnicFrontUrl: cnicFront,
           cnicBackUrl: cnicBack,
@@ -679,11 +657,11 @@ function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }
               const active = i === step;
               return (
                 <div key={i} className="flex items-center">
-                  <div className={`flex flex-col items-center gap-1 transition-all`}>
+                  <div className="flex flex-col items-center gap-1 transition-all">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-2 transition-all ${
-                      done    ? "bg-emerald-500 border-emerald-500 text-white" :
-                      active  ? "bg-primary border-primary text-primary-foreground" :
-                                "bg-background border-border text-muted-foreground"
+                      done   ? "bg-emerald-500 border-emerald-500 text-white" :
+                      active ? "bg-primary border-primary text-primary-foreground" :
+                               "bg-background border-border text-muted-foreground"
                     }`}>
                       {done ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
                     </div>
@@ -720,104 +698,12 @@ function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }
                 transition={{ duration: 0.2 }}
                 className="p-5 space-y-4"
               >
-                {/* ── Step 0: Email Verification ── */}
+                {/* ── Step 0: Info ── */}
                 {step === 0 && (
                   <>
                     <p className="text-xs text-muted-foreground -mt-1 mb-1">
-                      Verify your email address to proceed.
+                      Fill in your seller info. We'll send a verification code to your email.
                     </p>
-
-                    {/* Email display/input */}
-                    <div>
-                      <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
-                        Email Address
-                      </label>
-                      {prefillEmail ? (
-                        <div className="flex items-center gap-3 bg-background border border-border rounded-xl px-4 py-3">
-                          <Mail className="w-4 h-4 text-primary shrink-0" />
-                          <span className="text-white font-medium flex-1 truncate">{emailInput}</span>
-                          <span className="text-[10px] bg-emerald-500/15 text-emerald-400 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">Linked</span>
-                        </div>
-                      ) : (
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                          <input
-                            type="email"
-                            value={emailInput}
-                            onChange={(e) => setEmailInput(e.target.value)}
-                            placeholder="your@email.com"
-                            disabled={otpSent}
-                            className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary disabled:opacity-60 transition"
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* OTP input — appears after sending */}
-                    {otpSent && (
-                      <div>
-                        <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
-                          6-Digit Code
-                        </label>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={6}
-                          value={otpCode}
-                          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                          placeholder="123456"
-                          autoFocus
-                          className="w-full bg-background border border-border rounded-xl px-4 py-3 text-white text-center text-2xl tracking-[0.5em] placeholder:text-muted-foreground placeholder:tracking-normal placeholder:text-base focus:outline-none focus:border-primary transition"
-                        />
-                        <p className="text-xs text-muted-foreground text-center mt-2">
-                          Sent to <span className="text-white">{emailInput}</span>.{" "}
-                          <button
-                            type="button"
-                            onClick={() => { setOtpSent(false); setOtpCode(""); setErrorMsg(""); }}
-                            className="text-primary hover:underline"
-                          >
-                            Change
-                          </button>
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Action button */}
-                    {!otpSent ? (
-                      <button
-                        type="button"
-                        onClick={requestOtp}
-                        disabled={otpLoading || !emailInput.trim()}
-                        className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-bold py-3 rounded-xl transition active:scale-[0.98] flex items-center justify-center gap-2"
-                      >
-                        {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : "Send Verification Code"}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={verifyOtp}
-                        disabled={otpLoading || otpCode.length < 6}
-                        className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-black font-bold py-3 rounded-xl transition active:scale-[0.98] flex items-center justify-center gap-2"
-                      >
-                        {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : "Verify & Continue →"}
-                      </button>
-                    )}
-                  </>
-                )}
-
-                {/* ── Step 1: Personal Info ── */}
-                {step === 1 && (
-                  <>
-                    <p className="text-xs text-muted-foreground -mt-1 mb-1">Fill in your public seller information.</p>
-
-                    {/* Verified email badge */}
-                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[10px] text-muted-foreground uppercase font-bold">Verified Email</p>
-                        <p className="text-sm text-emerald-300 font-medium truncate">{emailInput}</p>
-                      </div>
-                    </div>
 
                     <InputField
                       icon={User}
@@ -845,70 +731,98 @@ function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }
                     </div>
                     <InputField
                       icon={MessageCircle}
-                      label="WhatsApp (optional)"
+                      label="WhatsApp Number (optional)"
                       value={form.whatsapp}
                       onChange={set("whatsapp")}
                       placeholder="03XX-XXXXXXX"
                       autoComplete="tel"
                     />
-                    {/* Phone (read-only) */}
-                    <div className="flex items-center gap-2 bg-background/50 border border-border rounded-xl px-3 py-2.5">
-                      <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[10px] text-muted-foreground uppercase font-bold">Phone (from your account)</p>
-                        <p className="text-sm text-white/70 font-mono">{form.phone || "—"}</p>
-                      </div>
+                    {/* Email input */}
+                    <div>
+                      <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
+                        Email Address
+                      </label>
+                      {prefillEmail ? (
+                        <div className="flex items-center gap-3 bg-background border border-border rounded-xl px-4 py-3">
+                          <Mail className="w-4 h-4 text-primary shrink-0" />
+                          <span className="text-white font-medium flex-1 truncate">{emailInput}</span>
+                          <span className="text-[10px] bg-emerald-500/15 text-emerald-400 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">From account</span>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                          <input
+                            type="email"
+                            value={emailInput}
+                            onChange={(e) => setEmailInput(e.target.value)}
+                            placeholder="your@email.com"
+                            className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary transition"
+                          />
+                        </div>
+                      )}
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={goNextFromInfo}
+                      disabled={otpLoading}
+                      className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-black font-bold py-3 rounded-xl transition active:scale-[0.98] flex items-center justify-center gap-2"
+                    >
+                      {otpLoading
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending Code…</>
+                        : <>Send Verification Code <ArrowRight className="w-4 h-4" /></>}
+                    </button>
                   </>
                 )}
 
-                {/* ── Step 2: Password ── */}
-                {step === 2 && (
+                {/* ── Step 1: Email OTP ── */}
+                {step === 1 && (
                   <>
-                    <p className="text-xs text-muted-foreground -mt-1 mb-1">Set a password for your seller account.</p>
+                    <p className="text-xs text-muted-foreground -mt-1 mb-1">
+                      Enter the 6-digit code sent to your email.
+                    </p>
 
-                    <InputField
-                      icon={Lock}
-                      label="Password"
-                      type={showPw ? "text" : "password"}
-                      value={form.password}
-                      onChange={set("password")}
-                      placeholder="At least 6 characters"
-                      required
-                      autoComplete="new-password"
-                      testId="seller-signup-password"
-                      suffix={
-                        <button type="button" onClick={() => setShowPw(!showPw)} className="text-muted-foreground hover:text-white">
-                          {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                          6-Digit Code
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => { setDir(-1); setStep(0); setOtpCode(""); setErrorMsg(""); }}
+                          className="text-xs text-primary hover:underline font-medium"
+                        >
+                          Change email
                         </button>
-                      }
-                    />
-                    <InputField
-                      icon={Lock}
-                      label="Confirm Password"
-                      type={showCPw ? "text" : "password"}
-                      value={form.confirmPassword}
-                      onChange={set("confirmPassword")}
-                      placeholder="Repeat your password"
-                      required
-                      autoComplete="new-password"
-                      testId="seller-signup-confirm"
-                      suffix={
-                        <button type="button" onClick={() => setShowCPw(!showCPw)} className="text-muted-foreground hover:text-white">
-                          {showCPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      }
-                    />
-
-                    <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl px-3 py-2.5 text-xs text-blue-200/80 flex items-start gap-2">
-                      <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                      <p>This password is for your seller account login. Keep it safe.</p>
+                      </div>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                        placeholder="123456"
+                        autoFocus
+                        className="w-full bg-background border border-border rounded-xl px-4 py-3 text-white text-center text-2xl tracking-[0.5em] placeholder:text-muted-foreground placeholder:tracking-normal placeholder:text-base focus:outline-none focus:border-primary transition"
+                      />
+                      <p className="text-xs text-muted-foreground text-center mt-2">
+                        Sent to <span className="text-white font-medium">{emailInput}</span>
+                      </p>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={verifyOtp}
+                      disabled={otpLoading || otpCode.length < 6}
+                      className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-black font-bold py-3 rounded-xl transition active:scale-[0.98] flex items-center justify-center gap-2"
+                    >
+                      {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : "Verify & Continue →"}
+                    </button>
                   </>
                 )}
 
-                {/* ── Step 3: Identity Verification ── */}
-                {step === 3 && (
+                {/* ── Step 2: Identity Verification ── */}
+                {step === 2 && (
                   <form onSubmit={handleSubmit} id="seller-verify-form" className="space-y-4">
                     <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2.5 text-xs text-amber-200 flex items-start gap-2">
                       <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
@@ -925,7 +839,6 @@ function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }
                       autoComplete="off"
                       testId="seller-signup-cnic"
                     />
-
                     <FileUploadField
                       label="CNIC Front Photo"
                       hint="Clear photo of the front of your CNIC"
@@ -952,9 +865,9 @@ function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }
               </motion.div>
             </AnimatePresence>
 
-            {/* Navigation Buttons — hidden on step 0 (handled by OTP buttons above) */}
-            <div className={`px-5 pb-5 flex gap-2.5 ${step > 1 ? "justify-between" : step === 1 ? "justify-end" : "hidden"}`}>
-              {step > 1 && (
+            {/* Navigation footer — only for step 2 (Verify) */}
+            {step === 2 && (
+              <div className="px-5 pb-5 flex gap-2.5 justify-between">
                 <button
                   type="button"
                   onClick={goBack}
@@ -962,17 +875,6 @@ function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }
                 >
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
-              )}
-
-              {step >= 1 && step < STEPS.length - 1 ? (
-                <button
-                  type="button"
-                  onClick={goNext}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl transition active:scale-[0.98] text-sm"
-                >
-                  Next <ArrowRight className="w-4 h-4" />
-                </button>
-              ) : step === STEPS.length - 1 ? (
                 <button
                   type="submit"
                   form="seller-verify-form"
@@ -989,8 +891,8 @@ function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }
                     "Submit Application"
                   )}
                 </button>
-              ) : null}
-            </div>
+              </div>
+            )}
           </div>
 
           <p className="text-center text-xs text-muted-foreground mt-4">
