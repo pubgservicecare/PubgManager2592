@@ -1,54 +1,22 @@
-import nodemailer from "nodemailer";
-import dns from "node:dns";
+import { Resend } from "resend";
 import { db, emailLogsTable } from "@workspace/db";
 
-// ─── SMTP Setup ───────────────────────────────────────────────────────────────
+// ─── Resend Setup ─────────────────────────────────────────────────────────────
 
-const SMTP_HOST = process.env.SMTP_HOST || "";
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || "587");
-const SMTP_SECURE = process.env.SMTP_PORT === "465";
-const SMTP_USER = process.env.SMTP_USER || "";
-const SMTP_PASS = process.env.SMTP_PASS || "";
+const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
+const resendConfigured = RESEND_API_KEY.length > 0;
 
-const smtpConfigured = !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
+const resend: Resend | null = resendConfigured ? new Resend(RESEND_API_KEY) : null;
 
-let transporter: nodemailer.Transporter | null = null;
-if (smtpConfigured) {
-  transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_SECURE,
-    // Force IPv4 DNS resolution.
-    // `family:4` is ignored in Node.js 24 on some hosts (Render, etc.) —
-    // smtp.gmail.com still resolves to an IPv6 address causing ENETUNREACH.
-    // Overriding `lookup` intercepts DNS resolution and hard-forces family=4.
-    lookup: (hostname: string, options: dns.LookupOptions, callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void) => {
-      dns.lookup(hostname, { ...options, family: 4 }, callback);
-    },
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
-  } as any);
-
-  // ── Startup connectivity probe ─────────────────────────────────────────
-  // Runs once at module load. Errors here do NOT crash the server.
-  transporter.verify().then(() => {
-    console.log(
-      "[EMAIL] SMTP transport ready" +
-      ` | host=${SMTP_HOST} port=${SMTP_PORT} secure=${SMTP_SECURE} family=4` +
-      ` | user=***@${SMTP_USER.split("@")[1] ?? "?"}`
-    );
-  }).catch((err: Error & { code?: string; command?: string; responseCode?: number; response?: string }) => {
-    console.error(
-      "[EMAIL] SMTP verify FAILED" +
-      ` | host=${SMTP_HOST} port=${SMTP_PORT} secure=${SMTP_SECURE} family=4` +
-      ` | user=***@${SMTP_USER.split("@")[1] ?? "?"}` +
-      ` | code=${err.code ?? "?"} command=${err.command ?? "?"}` +
-      ` | responseCode=${err.responseCode ?? "?"} response=${err.response ?? "?"}` +
-      ` | message=${err.message}`
-    );
-  });
+if (resendConfigured) {
+  console.log("[EMAIL] Resend SDK initialised | from=CODExSTOCKS <noreply@codexstocks.org>");
+} else {
+  console.warn("[EMAIL] RESEND_API_KEY not set — emails will be logged but not sent (dev mode)");
 }
 
-const FROM = process.env.SMTP_FROM || "CODExSTOCKS <noreply@codexstocks.org>";
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const FROM = "CODExSTOCKS <noreply@codexstocks.org>";
 const SITE_URL = "https://www.codexstocks.org";
 const SUPPORT_EMAIL = "pubg.service.care@gmail.com";
 
@@ -228,61 +196,56 @@ async function sendEmail(opts: {
   type: string;
   campaignId?: number;
 }): Promise<void> {
-  if (!transporter) {
+  if (!resend) {
     console.warn(
-      `[EMAIL] DEV MODE (no transporter)` +
+      `[EMAIL] DEV MODE (no Resend client)` +
       ` | type=${opts.type} to=${opts.to} subject="${opts.subject}"` +
-      ` | Set SMTP_HOST+SMTP_USER+SMTP_PASS to enable real sending`,
+      ` | Set RESEND_API_KEY to enable real sending`,
     );
     logEmail({ ...opts, status: "sent" });
     return;
   }
 
-  const transportMeta =
-    `host=${SMTP_HOST} port=${SMTP_PORT} secure=${SMTP_SECURE} family=4` +
-    ` | user=***@${SMTP_USER.split("@")[1] ?? "?"}`;
-
   console.log(
-    `[EMAIL] sendMail attempt` +
-    ` | type=${opts.type} to=${opts.to} subject="${opts.subject}"` +
-    ` | ${transportMeta}`,
+    `[EMAIL] Resend send attempt` +
+    ` | type=${opts.type} to=${opts.to} subject="${opts.subject}"`,
   );
 
   try {
-    const info = await transporter.sendMail({
+    const { data, error } = await resend.emails.send({
       from: FROM,
       to: opts.to,
       subject: opts.subject,
       html: opts.html,
     });
-    const msgId: string = (info as any)?.messageId ?? "(none)";
-    const accepted: string[] = (info as any)?.accepted ?? [];
-    const rejected: string[] = (info as any)?.rejected ?? [];
+
+    if (error) {
+      const errMsg = `name=${error.name} message=${error.message}`;
+      console.error(
+        `[EMAIL] Resend send FAILED` +
+        ` | type=${opts.type} to=${opts.to}` +
+        ` | ${errMsg}`,
+      );
+      logEmail({ ...opts, status: "failed", error: errMsg });
+      throw new Error(errMsg);
+    }
+
+    const msgId: string = data?.id ?? "(none)";
     console.log(
-      `[EMAIL] sendMail OK` +
+      `[EMAIL] Resend send OK` +
       ` | type=${opts.type} to=${opts.to}` +
-      ` | messageId=${msgId} accepted=${accepted.join(",")} rejected=${rejected.join(",")}` +
-      ` | ${transportMeta}`,
+      ` | messageId=${msgId}`,
     );
     logEmail({ ...opts, status: "sent" });
   } catch (err: any) {
-    const code: string = err?.code ?? "?";
-    const cmd: string = err?.command ?? "?";
-    const respCode: number | string = err?.responseCode ?? "?";
-    const resp: string = err?.response ?? "?";
+    if (err?.message?.startsWith("name=")) throw err;
     const msg: string = err?.message ?? String(err);
     console.error(
-      `[EMAIL] sendMail FAILED` +
+      `[EMAIL] Resend send ERROR` +
       ` | type=${opts.type} to=${opts.to}` +
-      ` | code=${code} command=${cmd} responseCode=${respCode} response="${resp}"` +
-      ` | message="${msg}"` +
-      ` | ${transportMeta}`,
+      ` | message="${msg}"`,
     );
-    logEmail({
-      ...opts,
-      status: "failed",
-      error: `code=${code} cmd=${cmd} rc=${respCode} resp="${resp}" msg="${msg}"`,
-    });
+    logEmail({ ...opts, status: "failed", error: msg });
     throw err;
   }
 }
