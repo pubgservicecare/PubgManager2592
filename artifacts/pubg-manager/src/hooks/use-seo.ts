@@ -157,13 +157,26 @@ export function useSEO({
             name: SITE_NAME,
             url: SITE_URL,
           },
-          // Digital delivery — free, instant, no physical shipment.
+          // Digital delivery — free, instant, worldwide.
           shippingDetails: {
             "@type": "OfferShippingDetails",
-            shippingDestination: {
-              "@type": "DefinedRegion",
-              addressCountry: "PK",
-            },
+            shippingDestination: [
+              { "@type": "DefinedRegion", addressCountry: "PK" },
+              { "@type": "DefinedRegion", addressCountry: "IN" },
+              { "@type": "DefinedRegion", addressCountry: "ID" },
+              { "@type": "DefinedRegion", addressCountry: "BD" },
+              { "@type": "DefinedRegion", addressCountry: "AE" },
+              { "@type": "DefinedRegion", addressCountry: "SA" },
+              { "@type": "DefinedRegion", addressCountry: "TR" },
+              { "@type": "DefinedRegion", addressCountry: "MY" },
+              { "@type": "DefinedRegion", addressCountry: "PH" },
+              { "@type": "DefinedRegion", addressCountry: "US" },
+              { "@type": "DefinedRegion", addressCountry: "GB" },
+              { "@type": "DefinedRegion", addressCountry: "DE" },
+              { "@type": "DefinedRegion", addressCountry: "CA" },
+              { "@type": "DefinedRegion", addressCountry: "AU" },
+              { "@type": "DefinedRegion", addressCountry: "BR" },
+            ],
             shippingRate: {
               "@type": "MonetaryAmount",
               value: "0",
