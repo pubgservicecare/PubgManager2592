@@ -7,7 +7,7 @@ export const sellersTable = pgTable("sellers", {
   name: text("name").notNull(),
   username: text("username").unique(),
   email: text("email").notNull().unique(),
-  phone: text("phone").notNull(),
+  phone: text("phone"),
   whatsapp: text("whatsapp"),
   passwordHash: text("password_hash").notNull(),
   cnicNumber: text("cnic_number").notNull(),
