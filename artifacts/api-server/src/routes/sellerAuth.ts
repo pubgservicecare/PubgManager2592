@@ -93,21 +93,24 @@ router.post("/seller/signup", async (req, res): Promise<void> => {
     }
 
     // Reject duplicate applications from the same phone (= same customer).
-    const phoneDigits = phone.replace(/\D/g, "");
-    const existingByPhone = await db
-      .select({ id: sellersTable.id, status: sellersTable.status })
-      .from(sellersTable)
-      .where(sql`regexp_replace(${sellersTable.phone}, '[^0-9]', '', 'g') = ${phoneDigits}`);
-    if (existingByPhone.length > 0) {
-      const status = existingByPhone[0].status;
-      const messages: Record<string, string> = {
-        pending: "You already have a pending seller application. Please wait for admin review.",
-        approved: "You're already an approved seller. Use 'Become a Seller' to access your dashboard.",
-        rejected: "Your previous application was rejected. Re-apply support is coming soon.",
-        suspended: "Your seller account has been suspended. Contact support.",
-      };
-      res.status(409).json({ error: messages[status] || "A seller account already exists for your phone number." });
-      return;
+    // Skip this check if phone is not available (email-only customers).
+    if (phone) {
+      const phoneDigits = phone.replace(/\D/g, "");
+      const existingByPhone = await db
+        .select({ id: sellersTable.id, status: sellersTable.status })
+        .from(sellersTable)
+        .where(sql`regexp_replace(${sellersTable.phone}, '[^0-9]', '', 'g') = ${phoneDigits}`);
+      if (existingByPhone.length > 0) {
+        const status = existingByPhone[0].status;
+        const messages: Record<string, string> = {
+          pending: "You already have a pending seller application. Please wait for admin review.",
+          approved: "You're already an approved seller. Use 'Become a Seller' to access your dashboard.",
+          rejected: "Your previous application was rejected. Re-apply support is coming soon.",
+          suspended: "Your seller account has been suspended. Contact support.",
+        };
+        res.status(409).json({ error: messages[status] || "A seller account already exists for your phone number." });
+        return;
+      }
     }
 
     const { randomBytes } = await import("crypto");
