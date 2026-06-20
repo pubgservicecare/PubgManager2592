@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, settingsTable, testDatabaseUrl } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLog";
+import { sendRawEmail } from "../lib/email";
 import bcrypt from "bcryptjs";
 
 const router: IRouter = Router();
@@ -236,6 +237,46 @@ router.get("/admin/env-check", requireAdmin, (_req, res): void => {
       },
     ],
   });
+});
+
+// ─── Test Resend email (admin only) ──────────────────────────────────────────
+
+router.post("/admin/test-email", requireAdmin, async (req, res): Promise<void> => {
+  const { to } = req.body ?? {};
+  if (!to || typeof to !== "string" || !to.includes("@")) {
+    res.status(400).json({ ok: false, error: "A valid recipient email address is required." });
+    return;
+  }
+
+  const resendConfigured = !!process.env.RESEND_API_KEY?.trim();
+  if (!resendConfigured) {
+    res.status(400).json({
+      ok: false,
+      error: "RESEND_API_KEY is not set. Add it to your environment variables and restart the server.",
+    });
+    return;
+  }
+
+  const html = `
+    <h2 style="margin:0 0 8px;color:#FFFFFF;">✅ Test Email Successful</h2>
+    <p style="margin:0 0 12px;color:#BBBBBB;">This email was sent from the <strong style="color:#FFAA00;">CODExSTOCKS admin panel</strong> to verify your Resend integration is working correctly.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0;">
+      <tr><td style="font-size:12px;color:#666;padding:8px 0;border-bottom:1px solid #1a1a1a;">Sent via</td><td style="font-size:13px;color:#fff;font-weight:600;padding:8px 0;border-bottom:1px solid #1a1a1a;text-align:right;">Resend API</td></tr>
+      <tr><td style="font-size:12px;color:#666;padding:8px 0;border-bottom:1px solid #1a1a1a;">From</td><td style="font-size:13px;color:#fff;font-weight:600;padding:8px 0;border-bottom:1px solid #1a1a1a;text-align:right;">CODExSTOCKS &lt;noreply@codexstocks.org&gt;</td></tr>
+      <tr><td style="font-size:12px;color:#666;padding:8px 0;">Time</td><td style="font-size:13px;color:#fff;font-weight:600;padding:8px 0;text-align:right;">${new Date().toLocaleString("en-PK", { timeZone: "Asia/Karachi" })} (PKT)</td></tr>
+    </table>
+    <p style="margin:16px 0 0;font-size:13px;color:#666;">Your email system is configured correctly. OTP, welcome, and password-reset emails will now reach your customers.</p>
+  `;
+
+  const result = await sendRawEmail(to.trim(), null, "CODExSTOCKS — Email Integration Test", html, "admin_test");
+
+  if (result.ok) {
+    req.log.info({ to }, "admin: test email sent successfully");
+    res.json({ ok: true, message: `Test email sent to ${to.trim()}. Check your inbox (and spam folder).` });
+  } else {
+    req.log.warn({ to, error: result.error }, "admin: test email failed");
+    res.status(500).json({ ok: false, error: result.error ?? "Failed to send test email." });
+  }
 });
 
 // ─── Test current DB connection (admin only) ──────────────────────────────────

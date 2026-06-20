@@ -86,6 +86,7 @@ const TABS = [
   { id: "security", label: "Security", icon: ShieldCheck },
   { id: "storage", label: "File Storage", icon: Cloud },
   { id: "database", label: "Database", icon: Database },
+  { id: "email", label: "Email", icon: Mail },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -101,6 +102,8 @@ export function AdminSettings() {
   const [testingNeonConnection, setTestingNeonConnection] = useState(false);
   const [showNeonUrl, setShowNeonUrl] = useState(false);
   const [copiedNeonUrl, setCopiedNeonUrl] = useState(false);
+  const [testEmailTo, setTestEmailTo] = useState("");
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
 
   const [form, setForm] = useState<FormState>({
     siteName: "",
@@ -213,6 +216,32 @@ export function AdminSettings() {
       toast({ title: "Connection Failed", description: "Network error. Please check server is running.", variant: "destructive" });
     } finally {
       setTestingNeonConnection(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!testEmailTo.trim() || !testEmailTo.includes("@")) {
+      toast({ title: "Invalid email", description: "Enter a valid recipient email address.", variant: "destructive" });
+      return;
+    }
+    setSendingTestEmail(true);
+    try {
+      const res = await fetch(apiUrl("/api/admin/test-email"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ to: testEmailTo.trim() }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast({ title: "Test Email Sent!", description: data.message, variant: "default" });
+      } else {
+        toast({ title: "Send Failed", description: data.error || "Could not send test email.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Network Error", description: "Could not reach the server. Is the API running?", variant: "destructive" });
+    } finally {
+      setSendingTestEmail(false);
     }
   };
 
@@ -887,6 +916,98 @@ export function AdminSettings() {
                     Save settings first, then test to verify the URL is correct.
                   </p>
                 </div>
+              </Section>
+            )}
+
+            {activeTab === "email" && (
+              <Section title="Email" subtitle="Verify your Resend email integration is working correctly." icon={<Mail className="w-5 h-5" />}>
+
+                {/* Status card */}
+                <div className={`flex items-start gap-3 p-4 rounded-xl border ${process.env.RESEND_API_KEY ? "bg-emerald-500/10 border-emerald-500/30" : "bg-amber-500/10 border-amber-500/30"}`}>
+                  <Mail className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-white">Resend API — Email Provider</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      All transactional emails (OTP signup, forgot password, welcome, password changed) are sent via{" "}
+                      <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
+                        Resend <ExternalLink className="w-3 h-3" />
+                      </a>
+                      {" "}using <code className="bg-secondary px-1 rounded">noreply@codexstocks.org</code> as the sender. Get your API key at resend.com/api-keys and add it as{" "}
+                      <code className="bg-secondary px-1 rounded">RESEND_API_KEY</code> in your environment variables.
+                    </p>
+                  </div>
+                </div>
+
+                {/* What gets logged */}
+                <div className="bg-secondary/30 border border-border rounded-xl p-4 flex items-start gap-3">
+                  <BookOpen className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p className="font-bold text-white text-sm">All emails are logged</p>
+                    <p className="leading-relaxed">
+                      Every email attempt is recorded in the <code className="bg-secondary px-1 rounded">email_logs</code> table — whether sent or failed — with the type, recipient, subject, and provider response. You can view them in the Email Campaigns section.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Test email section */}
+                <div className="space-y-3">
+                  <label className="text-sm font-bold text-muted-foreground uppercase block tracking-wide">
+                    Send a Test Email
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Enter any email address and click Send. You'll receive a branded CODExSTOCKS test email confirming Resend is working. Check spam if it doesn't arrive within 30 seconds.
+                  </p>
+                  <div className="flex gap-3 flex-col sm:flex-row">
+                    <div className="relative flex-1">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="email"
+                        value={testEmailTo}
+                        onChange={(e) => setTestEmailTo(e.target.value)}
+                        placeholder="your@email.com"
+                        className="w-full bg-background border border-border focus:border-primary rounded-xl pl-10 pr-4 py-3 text-white outline-none text-sm"
+                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleSendTestEmail())}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSendTestEmail}
+                      disabled={sendingTestEmail || !testEmailTo.trim()}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-sm transition-all disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {sendingTestEmail ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+                      ) : (
+                        <><Mail className="w-4 h-4" /> Send Test Email</>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Email types reference */}
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Emails sent automatically</p>
+                  <div className="grid gap-2">
+                    {[
+                      { type: "OTP Verification", trigger: "Customer signup or password reset", icon: "🔢" },
+                      { type: "Welcome Email", trigger: "After successful signup", icon: "🎮" },
+                      { type: "Password Changed", trigger: "When customer changes password", icon: "🔒" },
+                      { type: "Password Reset Done", trigger: "After forgot-password flow completes", icon: "✅" },
+                      { type: "Purchase Confirmation", trigger: "After account purchase", icon: "💳" },
+                      { type: "Campaign Emails", trigger: "Admin-initiated bulk or single sends", icon: "📣" },
+                    ].map((item) => (
+                      <div key={item.type} className="flex items-center gap-3 bg-background border border-border rounded-xl px-4 py-3">
+                        <span className="text-lg">{item.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-white">{item.type}</p>
+                          <p className="text-xs text-muted-foreground truncate">{item.trigger}</p>
+                        </div>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-bold uppercase shrink-0">Active</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
               </Section>
             )}
 
