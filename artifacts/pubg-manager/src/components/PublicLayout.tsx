@@ -389,109 +389,130 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
       </main>
 
       <footer className="bg-gradient-to-b from-card to-background border-t border-border mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-6 sm:pt-10 sm:pb-8">
+
+          {/* Top: logo + tagline (mobile only) */}
+          <div className="flex items-center gap-3 mb-6 sm:hidden">
+            {logoUrl ? (
+              <img
+                src={`/api/storage${logoUrl}`}
+                alt={settings?.siteName || "Logo"}
+                className="w-8 h-8 rounded-lg object-cover"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                <Gamepad2 className="w-4 h-4 text-primary-foreground" />
+              </div>
+            )}
+            <span className="font-display font-bold text-white tracking-widest text-sm">
+              {settings?.siteName || "CODEXSTOCKS"}
+            </span>
+          </div>
+
+          {/* Main grid: 2-col on mobile, 4-col on desktop */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-8">
+
             {/* Quick Links */}
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-widest text-white mb-4">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary mb-3">
                 Quick Links
               </h4>
-              <ul className="space-y-2.5 text-sm">
-                <li>
-                  <Link href="/">
-                    <span className="text-muted-foreground hover:text-primary cursor-pointer transition-colors">Marketplace</span>
-                  </Link>
-                </li>
+              <ul className="space-y-2 text-sm">
                 <li>
                   <Link href="/accounts">
-                    <span className="text-muted-foreground hover:text-primary cursor-pointer transition-colors">All Accounts</span>
+                    <span className="text-muted-foreground hover:text-white cursor-pointer transition-colors">All Accounts</span>
                   </Link>
                 </li>
                 <li>
                   <Link href="/faq">
-                    <span className="text-muted-foreground hover:text-primary cursor-pointer transition-colors">FAQ / Help</span>
+                    <span className="text-muted-foreground hover:text-white cursor-pointer transition-colors">FAQ / Help</span>
                   </Link>
                 </li>
                 <li>
                   <Link href="/chat/guest">
-                    <span className="text-muted-foreground hover:text-primary cursor-pointer transition-colors">Contact Support</span>
+                    <span className="text-muted-foreground hover:text-white cursor-pointer transition-colors">Support</span>
                   </Link>
                 </li>
                 <li>
                   <Link href="/seller/signup">
-                    <span className="text-muted-foreground hover:text-primary cursor-pointer transition-colors">Become a Seller</span>
+                    <span className="text-muted-foreground hover:text-white cursor-pointer transition-colors">Become Seller</span>
                   </Link>
                 </li>
               </ul>
             </div>
 
-            {/* Reviews */}
+            {/* Account */}
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-widest text-white mb-4">
-                Reviews
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary mb-3">
+                Account
               </h4>
-              <ul className="space-y-2.5 text-sm">
+              <ul className="space-y-2 text-sm">
                 <li>
-                  <Link href="/reviews">
-                    <span className="text-muted-foreground hover:text-primary cursor-pointer transition-colors">All Reviews</span>
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/reviews">
-                    <span className="text-muted-foreground hover:text-primary cursor-pointer transition-colors">Add a Review</span>
+                  <Link href="/login">
+                    <span className="text-muted-foreground hover:text-white cursor-pointer transition-colors">Login</span>
                   </Link>
                 </li>
                 <li>
                   <Link href="/signup">
-                    <span className="text-muted-foreground hover:text-primary cursor-pointer transition-colors">Create Account</span>
+                    <span className="text-muted-foreground hover:text-white cursor-pointer transition-colors">Register</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/my">
+                    <span className="text-muted-foreground hover:text-white cursor-pointer transition-colors">My Dashboard</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/reviews">
+                    <span className="text-muted-foreground hover:text-white cursor-pointer transition-colors">Reviews</span>
                   </Link>
                 </li>
               </ul>
             </div>
 
             {/* Contact */}
-            <div>
-              <h4 className="text-xs font-bold uppercase tracking-widest text-white mb-4">
-                Get in Touch
+            <div className="col-span-2 sm:col-span-1">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary mb-3">
+                Contact
               </h4>
-              <ul className="space-y-3 text-sm text-muted-foreground">
+              <ul className="space-y-2.5 text-sm text-muted-foreground">
                 {supportEmail && (
-                  <li className="flex items-start gap-2.5">
-                    <Mail className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
-                    <a href={`mailto:${supportEmail}`} className="hover:text-white transition-colors break-all">
-                      {supportEmail}
+                  <li>
+                    <a href={`mailto:${supportEmail}`} className="flex items-center gap-2 hover:text-white transition-colors">
+                      <Mail className="w-3.5 h-3.5 shrink-0 text-primary" />
+                      <span className="truncate">{supportEmail}</span>
                     </a>
                   </li>
                 )}
                 {settings?.whatsappNumber && (
-                  <li className="flex items-start gap-2.5">
-                    <MessageCircle className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
+                  <li>
                     <a
                       href={`https://wa.me/${settings.whatsappNumber.replace(/\D/g, "")}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="hover:text-white transition-colors"
+                      className="flex items-center gap-2 hover:text-white transition-colors"
                     >
-                      {settings.whatsappNumber}
+                      <MessageCircle className="w-3.5 h-3.5 shrink-0 text-primary" />
+                      <span>{settings.whatsappNumber}</span>
                     </a>
                   </li>
                 )}
                 {businessAddress && (
-                  <li className="flex items-start gap-2.5">
-                    <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
-                    <span>{businessAddress}</span>
+                  <li className="flex items-start gap-2">
+                    <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
+                    <span className="leading-snug">{businessAddress}</span>
                   </li>
                 )}
               </ul>
             </div>
 
             {/* Follow Us */}
-            <div>
-              <h4 className="text-xs font-bold uppercase tracking-widest text-white mb-4">
+            <div className="col-span-2 sm:col-span-1">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary mb-3">
                 Follow Us
               </h4>
               {socials.length > 0 ? (
-                <div className="flex flex-wrap gap-2.5">
+                <div className="flex flex-wrap gap-2">
                   {socials.map((s) => {
                     const Icon = s.icon;
                     return (
@@ -502,24 +523,31 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
                         rel="noreferrer"
                         aria-label={s.label}
                         title={s.label}
-                        className="w-10 h-10 rounded-lg bg-secondary/60 border border-border hover:bg-primary hover:border-primary hover:text-primary-foreground text-muted-foreground flex items-center justify-center transition-all hover:-translate-y-0.5"
+                        className="w-9 h-9 rounded-lg bg-secondary/60 border border-border hover:bg-primary hover:border-primary hover:text-primary-foreground text-muted-foreground flex items-center justify-center transition-all hover:-translate-y-0.5"
                       >
-                        <Icon className="w-[18px] h-[18px]" />
+                        <Icon className="w-4 h-4" />
                       </a>
                     );
                   })}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  Stay tuned — social links coming soon.
-                </p>
+                <div className="flex flex-wrap gap-2">
+                  {[Facebook, Instagram, Youtube, Music2, MessageCircle].map((Icon, i) => (
+                    <div
+                      key={i}
+                      className="w-9 h-9 rounded-lg bg-secondary/30 border border-border/40 text-muted-foreground/30 flex items-center justify-center"
+                    >
+                      <Icon className="w-4 h-4" />
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
 
-          {/* Rate this Platform strip */}
-          <div className="mt-10 pt-6 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-muted-foreground">
+          {/* Bottom bar */}
+          <div className="mt-8 pt-5 border-t border-border/40 flex flex-col-reverse sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground text-center sm:text-left">
               {footerText || `© ${new Date().getFullYear()} ${settings?.siteName || "PUBG Account Manager"} — All rights reserved.`}
             </p>
             <Link href="/reviews">
