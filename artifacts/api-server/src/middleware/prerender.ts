@@ -399,9 +399,12 @@ function renderAccountHtml(req: Request, data: AccountPageData): string {
       url: canonicalUrl,
       seller: { "@type": "Organization", name: siteName, url: siteUrl },
       // Digital delivery — free, instant, no physical shipment.
-      // Matches shippingDetails in use-seo.ts exactly.
       shippingDetails: {
         "@type": "OfferShippingDetails",
+        shippingDestination: {
+          "@type": "DefinedRegion",
+          addressCountry: "PK",
+        },
         shippingRate: {
           "@type": "MonetaryAmount",
           value: "0",

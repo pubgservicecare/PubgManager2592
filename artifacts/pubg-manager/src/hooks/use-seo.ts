@@ -158,11 +158,12 @@ export function useSEO({
             url: SITE_URL,
           },
           // Digital delivery — free, instant, no physical shipment.
-          // No shippingDestination restriction = worldwide.
-          // "001" (UN M.49) is NOT ISO 3166-1 alpha-2 — removed to avoid
-          // Google Merchant Listing validation errors.
           shippingDetails: {
             "@type": "OfferShippingDetails",
+            shippingDestination: {
+              "@type": "DefinedRegion",
+              addressCountry: "PK",
+            },
             shippingRate: {
               "@type": "MonetaryAmount",
               value: "0",
