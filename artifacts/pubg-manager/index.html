@@ -89,6 +89,11 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
 
+    <!-- Google Sign-In: preconnect + preload so the button renders instantly -->
+    <link rel="preconnect" href="https://accounts.google.com" />
+    <link rel="preload" href="https://accounts.google.com/gsi/client" as="script" />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
     <!-- Non-blocking font loading: preconnect first, then load async -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
