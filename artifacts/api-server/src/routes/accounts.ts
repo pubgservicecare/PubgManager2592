@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, isNull, and, inArray, sql } from "drizzle-orm";
+import { eq, desc, isNull, isNotNull, and, inArray, sql } from "drizzle-orm";
 import { db, accountsTable, accountLinksTable, paymentsTable, customersTable, historyTable, sellersTable, customerUsersTable } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLog";
@@ -16,16 +16,14 @@ function isPending(linkStatus: string, accountStatus: string): boolean {
   return false;
 }
 
-async function attachSellerName(account: any): Promise<string | null> {
-  if (!account.sellerId) return null;
-  const [s] = await db.select().from(sellersTable).where(eq(sellersTable.id, account.sellerId));
-  return s?.name ?? null;
-}
-
-async function attachSellerUsername(account: any): Promise<string | null> {
-  if (!account.sellerId) return null;
-  const [s] = await db.select({ username: sellersTable.username }).from(sellersTable).where(eq(sellersTable.id, account.sellerId));
-  return s?.username ?? null;
+// Phase 3: Single seller lookup replacing two separate attachSellerName/attachSellerUsername calls
+async function attachSeller(account: any): Promise<{ name: string | null; username: string | null }> {
+  if (!account.sellerId) return { name: null, username: null };
+  const [s] = await db
+    .select({ name: sellersTable.name, username: sellersTable.username })
+    .from(sellersTable)
+    .where(eq(sellersTable.id, account.sellerId));
+  return { name: s?.name ?? null, username: s?.username ?? null };
 }
 
 async function buildAccountResponse(account: any, isAdmin = true) {
@@ -100,23 +98,138 @@ async function buildAccountResponse(account: any, isAdmin = true) {
     viewCount: account.viewCount ?? 0,
   };
 
+  const seller = await attachSeller(account);
   if (isAdmin) {
-    const sellerName = await attachSellerName(account);
-    const sellerUsername = await attachSellerUsername(account);
     result.sellerId = account.sellerId;
-    result.sellerName = sellerName;
-    result.sellerUsername = sellerUsername;
+    result.sellerName = seller.name;
+    result.sellerUsername = seller.username;
     result.purchasePrice = account.purchasePrice ? parseFloat(account.purchasePrice as string) : null;
     result.finalSoldPrice = account.finalSoldPrice ? parseFloat(account.finalSoldPrice as string) : null;
   } else {
     // Public: never expose real seller name/id, only their chosen public username
-    const sellerUsername = await attachSellerUsername(account);
     result.sellerId = null;
     result.sellerName = null;
-    result.sellerUsername = sellerUsername;
+    result.sellerUsername = seller.username;
   }
 
   return result;
+}
+
+// Phase 1+3+5: Batch response builder — uses pre-loaded maps, zero per-account DB queries
+function buildAccountListResponseFromMaps(
+  account: any,
+  isAdmin: boolean,
+  linksMap: Map<number, any[]>,
+  paymentsMap: Map<number, any[]>,
+  sellersMap: Map<number, any>,
+) {
+  const links = linksMap.get(account.id) ?? [];
+  const linksWithPending = links.map((l: any) => ({
+    ...l,
+    isPending: isPending(l.status, account.status),
+    createdAt: l.createdAt.toISOString(),
+  }));
+  const pendingLinksCount = linksWithPending.filter((l: any) => l.isPending).length;
+
+  let totalPaid: number | null = null;
+  let remainingAmount: number | null = null;
+  let nextDueDate: string | null = null;
+  let overdueCount = 0;
+  let dueSoonCount = 0;
+
+  if (account.status === "installment" && account.finalSoldPrice) {
+    const payments = paymentsMap.get(account.id) ?? [];
+    totalPaid = 0;
+    for (const p of payments) {
+      if (!p.paidAt) continue;
+      const a = parseFloat(p.amount as string);
+      totalPaid += p.isReversal ? -a : a;
+    }
+    remainingAmount = Math.max(0, parseFloat(account.finalSoldPrice as string) - totalPaid);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sevenDays = new Date(today);
+    sevenDays.setDate(sevenDays.getDate() + 7);
+
+    const upcoming = payments
+      .filter((p: any) => !p.paidAt && !p.isReversal && p.dueDate)
+      .map((p: any) => ({ ...p, _due: new Date(p.dueDate as any) }))
+      .sort((a: any, b: any) => a._due.getTime() - b._due.getTime());
+
+    if (upcoming.length > 0) {
+      nextDueDate = (upcoming[0].dueDate as any) ?? null;
+      overdueCount = upcoming.filter((p: any) => p._due < today).length;
+      dueSoonCount = upcoming.filter((p: any) => p._due >= today && p._due <= sevenDays).length;
+    }
+  }
+
+  const seller = account.sellerId ? sellersMap.get(account.sellerId) : null;
+
+  // Phase 5: Admin gets full payload; public gets only non-null/non-zero fields
+  if (isAdmin) {
+    return {
+      id: account.id,
+      slug: account.slug ?? null,
+      title: account.title,
+      accountId: account.accountId,
+      priceForSale: parseFloat(account.priceForSale as string),
+      purchasePrice: account.purchasePrice ? parseFloat(account.purchasePrice as string) : null,
+      finalSoldPrice: account.finalSoldPrice ? parseFloat(account.finalSoldPrice as string) : null,
+      purchaseDate: account.purchaseDate,
+      previousOwnerContact: account.previousOwnerContact,
+      videoUrl: account.videoUrl,
+      imageUrls: account.imageUrls || [],
+      description: account.description,
+      status: account.status,
+      visibility: account.visibility || "public",
+      sellerId: account.sellerId,
+      sellerName: seller?.name ?? null,
+      sellerUsername: seller?.username ?? null,
+      customerId: account.customerId,
+      customerName: account.customerName,
+      customerContact: account.customerContact,
+      createdAt: account.createdAt.toISOString(),
+      updatedAt: account.updatedAt.toISOString(),
+      links: linksWithPending,
+      pendingLinksCount,
+      totalPaid,
+      remainingAmount,
+      nextDueDate,
+      overdueCount,
+      dueSoonCount,
+      isFeatured: !!account.isFeatured,
+      featuredOrder: account.featuredOrder ?? null,
+      viewCount: account.viewCount ?? 0,
+    };
+  }
+
+  // Public: omit null/zero fields to reduce payload size
+  const pub: Record<string, any> = {
+    id: account.id,
+    slug: account.slug ?? null,
+    title: account.title,
+    accountId: account.accountId,
+    priceForSale: parseFloat(account.priceForSale as string),
+    videoUrl: account.videoUrl,
+    imageUrls: account.imageUrls || [],
+    description: account.description,
+    status: account.status,
+    visibility: account.visibility || "public",
+    sellerUsername: seller?.username ?? null,
+    createdAt: account.createdAt.toISOString(),
+    updatedAt: account.updatedAt.toISOString(),
+    pendingLinksCount,
+    isFeatured: !!account.isFeatured,
+    featuredOrder: account.featuredOrder ?? null,
+    viewCount: account.viewCount ?? 0,
+  };
+  if (totalPaid !== null) pub.totalPaid = totalPaid;
+  if (remainingAmount !== null) pub.remainingAmount = remainingAmount;
+  if (nextDueDate !== null) pub.nextDueDate = nextDueDate;
+  if (overdueCount > 0) pub.overdueCount = overdueCount;
+  if (dueSoonCount > 0) pub.dueSoonCount = dueSoonCount;
+  return pub;
 }
 
 router.get("/accounts", async (req, res): Promise<void> => {
@@ -126,28 +239,64 @@ router.get("/accounts", async (req, res): Promise<void> => {
   const listedBy = req.query.listedBy as string | undefined;
   const sellerIdQ = req.query.sellerId ? parseInt(req.query.sellerId as string, 10) : null;
   const sort = (req.query.sort as string) || "newest";
+  // Phase 6: Pagination structure — parsed but not yet enforced (keeps current behaviour)
+  // const page = Math.max(1, parseInt((req.query.page as string) || "1", 10));
+  // const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string) || "9999", 10)));
+
+  // Phase 4: Move all filtering into SQL — never pull unneeded rows into Node
+  const conditions: any[] = [isNull(accountsTable.deletedAt)];
+  if (isPublic || !isAdmin) {
+    conditions.push(eq(accountsTable.status, "active"));
+    conditions.push(eq(accountsTable.visibility, "public"));
+  } else {
+    if (statusFilter) conditions.push(eq(accountsTable.status, statusFilter as any));
+    if (listedBy === "admin") conditions.push(isNull(accountsTable.sellerId));
+    else if (listedBy === "seller") conditions.push(isNotNull(accountsTable.sellerId));
+    if (sellerIdQ) conditions.push(eq(accountsTable.sellerId, sellerIdQ));
+  }
 
   const accounts = await db
     .select()
     .from(accountsTable)
-    .where(isNull(accountsTable.deletedAt))
+    .where(and(...conditions))
     .orderBy(desc(accountsTable.createdAt));
 
-  let filtered = accounts;
-  if (isPublic || !isAdmin) {
-    filtered = accounts.filter((a) => PUBLIC_VISIBLE_STATUSES.has(a.status) && (a.visibility ?? "public") === "public");
-  } else {
-    if (statusFilter) filtered = filtered.filter((a) => a.status === statusFilter);
-    if (listedBy === "admin") filtered = filtered.filter((a) => a.sellerId === null);
-    else if (listedBy === "seller") filtered = filtered.filter((a) => a.sellerId !== null);
-    if (sellerIdQ) filtered = filtered.filter((a) => a.sellerId === sellerIdQ);
+  // Phase 1: Batch-load all related data in 3 parallel queries (replaces 4N per-account queries)
+  const accountIds = accounts.map((a) => a.id);
+  const sellerIds = [...new Set(accounts.map((a) => a.sellerId).filter((id): id is number => id !== null))];
+
+  const [allLinks, allPayments, allSellers] = await Promise.all([
+    accountIds.length > 0
+      ? db.select().from(accountLinksTable).where(inArray(accountLinksTable.accountId, accountIds))
+      : Promise.resolve([]),
+    accountIds.length > 0
+      ? db.select().from(paymentsTable).where(inArray(paymentsTable.accountId, accountIds))
+      : Promise.resolve([]),
+    sellerIds.length > 0
+      ? db.select({ id: sellersTable.id, name: sellersTable.name, username: sellersTable.username })
+          .from(sellersTable).where(inArray(sellersTable.id, sellerIds))
+      : Promise.resolve([]),
+  ]);
+
+  // O(1) lookup maps — built once, reused per account
+  const linksMap = new Map<number, any[]>();
+  for (const link of allLinks) {
+    if (!linksMap.has(link.accountId)) linksMap.set(link.accountId, []);
+    linksMap.get(link.accountId)!.push(link);
   }
+  const paymentsMap = new Map<number, any[]>();
+  for (const payment of allPayments) {
+    if (!paymentsMap.has(payment.accountId)) paymentsMap.set(payment.accountId, []);
+    paymentsMap.get(payment.accountId)!.push(payment);
+  }
+  const sellersMap = new Map<number, any>();
+  for (const seller of allSellers) sellersMap.set(seller.id, seller);
 
+  // Sort: featured first, then by sort param
   const priceOf = (a: any) => parseFloat(a.priceForSale as string) || 0;
-  const dateOf = (a: any) => new Date(a.createdAt as any).getTime();
+  const dateOf  = (a: any) => new Date(a.createdAt as any).getTime();
 
-  // Featured first (only for public/listing view)
-  filtered.sort((a, b) => {
+  accounts.sort((a, b) => {
     const af = (a.isFeatured ?? 0) > 0 ? 1 : 0;
     const bf = (b.isFeatured ?? 0) > 0 ? 1 : 0;
     if (af !== bf) return bf - af;
@@ -157,16 +306,18 @@ router.get("/accounts", async (req, res): Promise<void> => {
       if (ao !== bo) return ao - bo;
     }
     switch (sort) {
-      case "price_asc": return priceOf(a) - priceOf(b);
+      case "price_asc":  return priceOf(a) - priceOf(b);
       case "price_desc": return priceOf(b) - priceOf(a);
-      case "oldest": return dateOf(a) - dateOf(b);
-      case "popular": return (b.viewCount ?? 0) - (a.viewCount ?? 0);
+      case "oldest":     return dateOf(a)  - dateOf(b);
+      case "popular":    return (b.viewCount ?? 0) - (a.viewCount ?? 0);
       case "newest":
-      default: return dateOf(b) - dateOf(a);
+      default:           return dateOf(b)  - dateOf(a);
     }
   });
 
-  const result = await Promise.all(filtered.map((a) => buildAccountResponse(a, isAdmin && !isPublic)));
+  const result = accounts.map((a) =>
+    buildAccountListResponseFromMaps(a, !!(isAdmin && !isPublic), linksMap, paymentsMap, sellersMap),
+  );
   res.json(result);
 });
 
