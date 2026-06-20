@@ -1,9 +1,16 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, isNull, inArray } from "drizzle-orm";
-import { db, sellersTable, accountsTable, historyTable, customersTable, paymentsTable } from "@workspace/db";
+import { eq, desc, and, isNull, inArray, gt } from "drizzle-orm";
+import { createHash, randomBytes, randomInt } from "crypto";
+import { db, sellersTable, accountsTable, historyTable, customersTable, paymentsTable, emailVerificationsTable } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { requireSeller } from "../middlewares/sellerAuth";
 import { logActivity } from "../lib/activityLog";
+import { sendOtpEmail } from "../lib/email";
+import { checkRateLimit } from "../lib/rateLimit";
+
+function hashValue(v: string): string {
+  return createHash("sha256").update(v).digest("hex");
+}
 
 const router: IRouter = Router();
 
@@ -478,6 +485,81 @@ router.delete("/seller/accounts/:id", requireSeller, async (req, res): Promise<v
     details: existing.title,
   });
   res.sendStatus(204);
+});
+
+// ── Seller become-a-seller: email OTP verification ─────────────────────────
+
+router.post("/seller/verify-email/request", async (req, res): Promise<void> => {
+  const { email } = req.body;
+  if (!email || typeof email !== "string") {
+    res.status(400).json({ error: "email is required" });
+    return;
+  }
+  const emailLower = email.trim().toLowerCase();
+  try {
+    if (!(await checkRateLimit(`seller-email-otp:${emailLower}`, 3, 15 * 60 * 1000))) {
+      res.status(429).json({ error: "Too many requests. Please wait before requesting another code." });
+      return;
+    }
+    const otp = String(randomInt(100000, 999999));
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await db.insert(emailVerificationsTable).values({ email: emailLower, otpHash: hashValue(otp), expiresAt });
+    await sendOtpEmail(emailLower, otp, "signup");
+    req.log.info({ email: emailLower }, "seller/verify-email/request: OTP sent");
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "seller/verify-email/request: error");
+    res.status(500).json({ error: "Failed to send code. Please try again." });
+  }
+});
+
+router.post("/seller/verify-email/confirm", async (req, res): Promise<void> => {
+  const { email, otp } = req.body;
+  if (!email || !otp) {
+    res.status(400).json({ error: "email and otp are required" });
+    return;
+  }
+  const emailLower = email.trim().toLowerCase();
+  try {
+    const now = new Date();
+    const [record] = await db
+      .select()
+      .from(emailVerificationsTable)
+      .where(
+        and(
+          eq(emailVerificationsTable.email, emailLower),
+          isNull(emailVerificationsTable.verifiedAt),
+          gt(emailVerificationsTable.expiresAt, now),
+        ),
+      )
+      .orderBy(desc(emailVerificationsTable.createdAt))
+      .limit(1);
+
+    if (!record) {
+      res.status(400).json({ error: "Code expired or not found. Please request a new one." });
+      return;
+    }
+    if (record.attemptCount >= 5) {
+      res.status(429).json({ error: "Too many incorrect attempts. Please request a new code." });
+      return;
+    }
+    if (hashValue(String(otp).trim()) !== record.otpHash) {
+      await db.update(emailVerificationsTable)
+        .set({ attemptCount: record.attemptCount + 1 })
+        .where(eq(emailVerificationsTable.id, record.id));
+      res.status(400).json({ error: "Incorrect code. Please try again." });
+      return;
+    }
+    const verificationToken = randomBytes(32).toString("hex");
+    await db.update(emailVerificationsTable)
+      .set({ verifiedAt: now })
+      .where(eq(emailVerificationsTable.id, record.id));
+    req.log.info({ email: emailLower }, "seller/verify-email/confirm: OTP verified");
+    res.json({ ok: true, verificationToken });
+  } catch (err) {
+    req.log.error({ err }, "seller/verify-email/confirm: error");
+    res.status(500).json({ error: "Verification failed. Please try again." });
+  }
 });
 
 export default router;

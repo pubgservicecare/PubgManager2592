@@ -93,6 +93,7 @@ export function SellerSignupPage() {
       <SellerSignupForm
         prefillName={customer.name}
         prefillPhone={(customer as any).phone || ""}
+        prefillEmail={(customer as any).email || ""}
         onSuccess={() => setSubmitted(true)}
       />
     );
@@ -508,23 +509,30 @@ function EmailSignupFlow({ onSuccess }: { onSuccess: () => void }) {
 /* ─── Seller Signup — 3-Step Wizard ─────────────────────────────────────── */
 
 const STEPS = [
-  { label: "Info",    icon: User },
+  { label: "Email",    icon: Mail },
+  { label: "Info",     icon: User },
   { label: "Password", icon: Lock },
-  { label: "Verify",  icon: IdCard },
+  { label: "Verify",   icon: IdCard },
 ];
 
-function SellerSignupForm({ prefillName, prefillPhone, onSuccess }: { prefillName: string; prefillPhone: string; onSuccess: () => void }) {
+function SellerSignupForm({ prefillName, prefillPhone, prefillEmail, onSuccess }: { prefillName: string; prefillPhone: string; prefillEmail: string; onSuccess: () => void }) {
   const [, setLocation] = useLocation();
   const { refresh: refreshSeller } = useSellerAuth();
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [dir, setDir] = useState(1); // 1 = forward, -1 = back
+  const [dir, setDir] = useState(1);
+
+  // Email OTP state
+  const [emailInput, setEmailInput] = useState(prefillEmail || "");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [emailVerifToken, setEmailVerifToken] = useState("");
 
   const [form, setForm] = useState({
     name: prefillName || "",
     username: "",
-    email: "",
     whatsapp: "",
     phone: prefillPhone || "",
     password: "",
@@ -539,18 +547,60 @@ function SellerSignupForm({ prefillName, prefillPhone, onSuccess }: { prefillNam
 
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  const requestOtp = async () => {
+    if (!emailInput.trim()) { setErrorMsg("Please enter an email address"); return; }
+    setErrorMsg("");
+    setOtpLoading(true);
+    try {
+      const res = await fetch(apiUrl("/api/seller/verify-email/request"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailInput.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to send code");
+      setOtpSent(true);
+      setOtpCode("");
+    } catch (e: any) {
+      setErrorMsg(e.message);
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const verifyOtp = async () => {
+    if (otpCode.length < 6) { setErrorMsg("Please enter the 6-digit code"); return; }
+    setErrorMsg("");
+    setOtpLoading(true);
+    try {
+      const res = await fetch(apiUrl("/api/seller/verify-email/confirm"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailInput.trim(), otp: otpCode.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Verification failed");
+      setEmailVerifToken(data.verificationToken);
+      setDir(1);
+      setStep(1);
+    } catch (e: any) {
+      setErrorMsg(e.message);
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
   const goNext = () => {
     setErrorMsg("");
 
-    if (step === 0) {
+    if (step === 1) {
       if (!form.name.trim()) { setErrorMsg("Full name is required"); return; }
       if (!/^[a-zA-Z0-9_]{3,20}$/.test(form.username.trim())) {
         setErrorMsg("Username: 3-20 characters, letters/numbers/underscore only"); return;
       }
-      if (!form.email.trim()) { setErrorMsg("Email is required"); return; }
     }
 
-    if (step === 1) {
+    if (step === 2) {
       if (form.password.length < 6) { setErrorMsg("Password must be at least 6 characters"); return; }
       if (form.password !== form.confirmPassword) { setErrorMsg("Passwords do not match"); return; }
     }
@@ -585,7 +635,7 @@ function SellerSignupForm({ prefillName, prefillPhone, onSuccess }: { prefillNam
         body: JSON.stringify({
           name: form.name,
           username: form.username.trim(),
-          email: form.email,
+          email: emailInput.trim(),
           phone: form.phone,
           whatsapp: form.whatsapp || undefined,
           password: form.password,
@@ -670,10 +720,104 @@ function SellerSignupForm({ prefillName, prefillPhone, onSuccess }: { prefillNam
                 transition={{ duration: 0.2 }}
                 className="p-5 space-y-4"
               >
-                {/* ── Step 0: Personal Info ── */}
+                {/* ── Step 0: Email Verification ── */}
                 {step === 0 && (
                   <>
+                    <p className="text-xs text-muted-foreground -mt-1 mb-1">
+                      Verify your email address to proceed.
+                    </p>
+
+                    {/* Email display/input */}
+                    <div>
+                      <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
+                        Email Address
+                      </label>
+                      {prefillEmail ? (
+                        <div className="flex items-center gap-3 bg-background border border-border rounded-xl px-4 py-3">
+                          <Mail className="w-4 h-4 text-primary shrink-0" />
+                          <span className="text-white font-medium flex-1 truncate">{emailInput}</span>
+                          <span className="text-[10px] bg-emerald-500/15 text-emerald-400 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">Linked</span>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                          <input
+                            type="email"
+                            value={emailInput}
+                            onChange={(e) => setEmailInput(e.target.value)}
+                            placeholder="your@email.com"
+                            disabled={otpSent}
+                            className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary disabled:opacity-60 transition"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* OTP input — appears after sending */}
+                    {otpSent && (
+                      <div>
+                        <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
+                          6-Digit Code
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={6}
+                          value={otpCode}
+                          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                          placeholder="123456"
+                          autoFocus
+                          className="w-full bg-background border border-border rounded-xl px-4 py-3 text-white text-center text-2xl tracking-[0.5em] placeholder:text-muted-foreground placeholder:tracking-normal placeholder:text-base focus:outline-none focus:border-primary transition"
+                        />
+                        <p className="text-xs text-muted-foreground text-center mt-2">
+                          Sent to <span className="text-white">{emailInput}</span>.{" "}
+                          <button
+                            type="button"
+                            onClick={() => { setOtpSent(false); setOtpCode(""); setErrorMsg(""); }}
+                            className="text-primary hover:underline"
+                          >
+                            Change
+                          </button>
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Action button */}
+                    {!otpSent ? (
+                      <button
+                        type="button"
+                        onClick={requestOtp}
+                        disabled={otpLoading || !emailInput.trim()}
+                        className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-bold py-3 rounded-xl transition active:scale-[0.98] flex items-center justify-center gap-2"
+                      >
+                        {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : "Send Verification Code"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={verifyOtp}
+                        disabled={otpLoading || otpCode.length < 6}
+                        className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-black font-bold py-3 rounded-xl transition active:scale-[0.98] flex items-center justify-center gap-2"
+                      >
+                        {otpLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : "Verify & Continue →"}
+                      </button>
+                    )}
+                  </>
+                )}
+
+                {/* ── Step 1: Personal Info ── */}
+                {step === 1 && (
+                  <>
                     <p className="text-xs text-muted-foreground -mt-1 mb-1">Fill in your public seller information.</p>
+
+                    {/* Verified email badge */}
+                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">Verified Email</p>
+                        <p className="text-sm text-emerald-300 font-medium truncate">{emailInput}</p>
+                      </div>
+                    </div>
 
                     <InputField
                       icon={User}
@@ -700,16 +844,6 @@ function SellerSignupForm({ prefillName, prefillPhone, onSuccess }: { prefillNam
                       </p>
                     </div>
                     <InputField
-                      icon={Mail}
-                      label="Email"
-                      type="email"
-                      value={form.email}
-                      onChange={set("email")}
-                      required
-                      autoComplete="email"
-                      testId="seller-signup-email"
-                    />
-                    <InputField
                       icon={MessageCircle}
                       label="WhatsApp (optional)"
                       value={form.whatsapp}
@@ -728,8 +862,8 @@ function SellerSignupForm({ prefillName, prefillPhone, onSuccess }: { prefillNam
                   </>
                 )}
 
-                {/* ── Step 1: Password ── */}
-                {step === 1 && (
+                {/* ── Step 2: Password ── */}
+                {step === 2 && (
                   <>
                     <p className="text-xs text-muted-foreground -mt-1 mb-1">Set a password for your seller account.</p>
 
@@ -773,8 +907,8 @@ function SellerSignupForm({ prefillName, prefillPhone, onSuccess }: { prefillNam
                   </>
                 )}
 
-                {/* ── Step 2: Identity Verification ── */}
-                {step === 2 && (
+                {/* ── Step 3: Identity Verification ── */}
+                {step === 3 && (
                   <form onSubmit={handleSubmit} id="seller-verify-form" className="space-y-4">
                     <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2.5 text-xs text-amber-200 flex items-start gap-2">
                       <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
@@ -818,9 +952,9 @@ function SellerSignupForm({ prefillName, prefillPhone, onSuccess }: { prefillNam
               </motion.div>
             </AnimatePresence>
 
-            {/* Navigation Buttons */}
-            <div className={`px-5 pb-5 flex gap-2.5 ${step > 0 ? "justify-between" : "justify-end"}`}>
-              {step > 0 && (
+            {/* Navigation Buttons — hidden on step 0 (handled by OTP buttons above) */}
+            <div className={`px-5 pb-5 flex gap-2.5 ${step > 1 ? "justify-between" : step === 1 ? "justify-end" : "hidden"}`}>
+              {step > 1 && (
                 <button
                   type="button"
                   onClick={goBack}
@@ -830,7 +964,7 @@ function SellerSignupForm({ prefillName, prefillPhone, onSuccess }: { prefillNam
                 </button>
               )}
 
-              {step < STEPS.length - 1 ? (
+              {step >= 1 && step < STEPS.length - 1 ? (
                 <button
                   type="button"
                   onClick={goNext}
@@ -838,7 +972,7 @@ function SellerSignupForm({ prefillName, prefillPhone, onSuccess }: { prefillNam
                 >
                   Next <ArrowRight className="w-4 h-4" />
                 </button>
-              ) : (
+              ) : step === STEPS.length - 1 ? (
                 <button
                   type="submit"
                   form="seller-verify-form"
@@ -855,7 +989,7 @@ function SellerSignupForm({ prefillName, prefillPhone, onSuccess }: { prefillNam
                     "Submit Application"
                   )}
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
 

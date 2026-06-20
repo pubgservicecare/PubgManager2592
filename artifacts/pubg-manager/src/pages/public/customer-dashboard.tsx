@@ -202,6 +202,20 @@ export function CustomerDashboard() {
           </div>
         </div>
 
+        {/* Mobile quick logout row */}
+        <div className="flex items-center justify-between lg:hidden">
+          <p className="text-xs text-muted-foreground">
+            Logged in as <span className="text-white font-semibold">{customer.name}</span>
+          </p>
+          <button
+            onClick={() => setShowLogoutConfirm(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40 text-xs font-semibold transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Logout
+          </button>
+        </div>
+
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <StatCard
@@ -272,7 +286,7 @@ export function CustomerDashboard() {
           {/* Left: Quick Actions */}
           <div className="lg:col-span-2 space-y-5">
             <SectionCard title="Quick Actions" icon={<Sparkles className="w-4 h-4 text-primary" />}>
-              <div className="grid sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <ActionTile
                   href="/chat"
                   icon={<MessageSquare className="w-5 h-5" />}
@@ -382,14 +396,16 @@ export function CustomerDashboard() {
 
           {/* Right: Sidebar */}
           <div className="space-y-5">
-            {/* Account Info */}
-            <SectionCard title="Account Details" icon={<ShieldCheck className="w-4 h-4 text-primary" />}>
-              <div className="space-y-3">
-                <DetailRow label="Full Name" value={customer.name} />
-                {customer.phone && <DetailRow label="Phone" value={customer.phone} />}
-                <DetailRow label="Account Type" value="Customer" />
-              </div>
-            </SectionCard>
+            {/* Account Info — hidden on mobile (redundant with hero) */}
+            <div className="hidden lg:block">
+              <SectionCard title="Account Details" icon={<ShieldCheck className="w-4 h-4 text-primary" />}>
+                <div className="space-y-3">
+                  <DetailRow label="Full Name" value={customer.name} />
+                  {customer.phone && <DetailRow label="Phone" value={customer.phone} />}
+                  <DetailRow label="Account Type" value="Customer" />
+                </div>
+              </SectionCard>
+            </div>
 
             {/* Referral Card */}
             {referral?.referralCode && (
@@ -426,10 +442,10 @@ export function CustomerDashboard() {
               </div>
             )}
 
-            {/* Logout */}
+            {/* Logout — desktop only (mobile logout is at top) */}
             <button
               onClick={() => setShowLogoutConfirm(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-border hover:border-destructive/40 hover:bg-destructive/5 text-muted-foreground hover:text-destructive transition-colors font-semibold text-sm"
+              className="hidden lg:flex w-full items-center justify-center gap-2 py-3 rounded-xl border border-border hover:border-destructive/40 hover:bg-destructive/5 text-muted-foreground hover:text-destructive transition-colors font-semibold text-sm"
               data-testid="logout-button"
             >
               <LogOut className="w-4 h-4" />
