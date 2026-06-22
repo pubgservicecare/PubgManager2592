@@ -159,17 +159,23 @@ router.get("/admin/env-check", requireAdmin, (_req, res): void => {
 
   const hasNeon = has("NEON_DATABASE_URL");
   const hasDbUrl = has("DATABASE_URL");
+  const isSameOrigin = process.env.SAME_ORIGIN_DEPLOYMENT === "true";
+  const isProd = process.env.NODE_ENV === "production";
   const activeDbSource: string | null = hasNeon ? "NEON_DATABASE_URL" : hasDbUrl ? "DATABASE_URL" : null;
 
   // NEON_DATABASE_URL is only "critical" if DATABASE_URL is also absent (no fallback).
-  // If DATABASE_URL exists as fallback, NEON is merely the preferred/recommended choice.
   const neonCategory: "critical" | "feature" | "optional" = hasDbUrl ? "feature" : "critical";
   // DATABASE_URL is "critical" when it is the active DB source (NEON not set).
   const dbUrlCategory: "critical" | "feature" | "optional" = hasNeon ? "optional" : "critical";
+  // SITE_URL: required in production for SEO/sitemap; optional in development.
+  const siteUrlCategory: "critical" | "feature" | "optional" = isProd ? "feature" : "optional";
+  // FRONTEND_URL: only needed in cross-origin mode. In same-origin deployment
+  // the backend serves the frontend directly, so CORS headers are never sent.
+  const frontendUrlCategory: "critical" | "feature" | "optional" = isSameOrigin ? "optional" : "feature";
 
   res.json({
     nodeEnv: process.env.NODE_ENV || "development",
-    isProduction: process.env.NODE_ENV === "production",
+    isProduction: isProd,
     activeDbSource,
     vars: [
       // ── Critical — app won't work without these ──────────────────────────
@@ -179,8 +185,8 @@ router.get("/admin/env-check", requireAdmin, (_req, res): void => {
         category: neonCategory,
         label: "Neon Database URL" + (activeDbSource === "NEON_DATABASE_URL" ? " ← active" : ""),
         description: hasDbUrl
-          ? `Recommended explicit Neon PostgreSQL URL. Currently using DATABASE_URL as the active connection — app is connected. Set this on Render for a dedicated Neon instance.`
-          : "Primary Neon PostgreSQL connection string. App uses DATABASE_URL as fallback, but neither is set — app will crash on startup.",
+          ? "Preferred Neon PostgreSQL URL. DATABASE_URL is the active fallback — DB is connected. Recommended: set this on Render for an explicit Neon instance."
+          : "Primary Neon PostgreSQL connection string. Neither NEON_DATABASE_URL nor DATABASE_URL is set — app will crash on startup.",
       },
       {
         key: "SESSION_SECRET",
@@ -195,35 +201,41 @@ router.get("/admin/env-check", requireAdmin, (_req, res): void => {
         set: has("RESEND_API_KEY"),
         category: "feature",
         label: "Resend API Key",
-        description: "API key from resend.com. Used to send OTP, welcome, password-reset, and transactional emails. Get it from resend.com/api-keys.",
-      },
-      {
-        key: "GOOGLE_CLIENT_ID",
-        set: has("GOOGLE_CLIENT_ID"),
-        category: "feature",
-        label: "Google Client ID",
-        description: "Enables 'Continue with Google' button on login/signup pages. Get it from Google Cloud Console → Credentials.",
-      },
-      {
-        key: "SITE_URL",
-        set: has("SITE_URL"),
-        category: "feature",
-        label: "Site URL",
-        description: "Canonical domain e.g. https://www.codexstocks.org — used in sitemap.xml and SEO canonical tags.",
+        description: "API key from resend.com. Required for OTP, welcome, and password-reset emails. Get it from resend.com/api-keys.",
       },
       {
         key: "SAME_ORIGIN_DEPLOYMENT",
         set: has("SAME_ORIGIN_DEPLOYMENT"),
         category: "feature",
         label: "Same Origin Deployment",
-        description: "Set to 'true' on Render to fix mobile iOS Safari login. Without it, iPhone users may fail to log in.",
+        description: "Set to 'true' on Render so the backend serves the frontend — fixes iOS Safari login and removes the need for FRONTEND_URL (CORS).",
+      },
+      {
+        key: "SITE_URL",
+        set: has("SITE_URL"),
+        category: siteUrlCategory,
+        label: "Site URL",
+        description: has("SITE_URL")
+          ? `Set to: ${process.env.SITE_URL} — used in sitemap.xml, SEO canonical tags, and structured data.`
+          : isProd
+          ? "Canonical domain e.g. https://www.codexstocks.org — required in production for sitemap.xml and SEO canonical tags."
+          : "Canonical domain e.g. https://www.codexstocks.org — optional in development, required in production for SEO.",
+      },
+      {
+        key: "GOOGLE_CLIENT_ID",
+        set: has("GOOGLE_CLIENT_ID"),
+        category: "feature",
+        label: "Google OAuth Client ID (login only)",
+        description: "Enables 'Continue with Google' sign-in button. NOTE: This is ONLY for Google OAuth login — it has NO relation to Google Cloud Storage (GCS). Images go to GCS via GCS_BUCKET + GCS_CREDENTIALS, which are separate.",
       },
       {
         key: "FRONTEND_URL",
         set: has("FRONTEND_URL"),
-        category: "feature",
+        category: frontendUrlCategory,
         label: "Frontend URL (CORS)",
-        description: "Comma-separated allowed CORS origins. Only needed in cross-origin mode (separate frontend + backend domains).",
+        description: isSameOrigin
+          ? "Not needed — SAME_ORIGIN_DEPLOYMENT=true means the backend serves the frontend directly. CORS headers are never sent for same-origin requests."
+          : "Comma-separated allowed CORS origins e.g. https://www.codexstocks.org. Required in cross-origin mode (separate frontend + backend domains).",
       },
       // ── Optional ─────────────────────────────────────────────────────────
       {
@@ -232,24 +244,24 @@ router.get("/admin/env-check", requireAdmin, (_req, res): void => {
         category: dbUrlCategory,
         label: "Database URL (Replit / fallback)" + (activeDbSource === "DATABASE_URL" ? " ← active" : ""),
         description: hasNeon
-          ? "Replit-managed PostgreSQL fallback. NEON_DATABASE_URL takes priority — this is unused."
+          ? "Replit-managed PostgreSQL. NEON_DATABASE_URL takes priority — this is unused."
           : hasDbUrl
-          ? "Active database connection. Set NEON_DATABASE_URL on Render for an explicit Neon instance."
+          ? "Active database connection. Set NEON_DATABASE_URL on Render for a dedicated Neon instance."
           : "Replit auto-provisions this. Not present in this environment.",
       },
       {
         key: "GCS_BUCKET",
         set: has("GCS_BUCKET"),
         category: "optional",
-        label: "GCS Bucket",
-        description: "Google Cloud Storage bucket name for persistent image storage. Uses local filesystem (lost on redeploy) if not set.",
+        label: "GCS Bucket (image storage)",
+        description: "Google Cloud Storage bucket name for persistent image storage. Completely separate from GOOGLE_CLIENT_ID (OAuth). Uses local filesystem if not set.",
       },
       {
         key: "GCS_CREDENTIALS",
         set: has("GCS_CREDENTIALS"),
         category: "optional",
-        label: "GCS Credentials",
-        description: "Base64-encoded Google Cloud service account JSON. Required for GCS image uploads.",
+        label: "GCS Credentials (service account)",
+        description: "Base64-encoded GCS service account JSON. This is a server-to-server credential — separate from GOOGLE_CLIENT_ID which is for user login only.",
       },
     ],
   });

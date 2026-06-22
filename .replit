@@ -127,5 +127,6 @@ SMTP_PORT = "587"
 SMTP_FROM = "CODExSTOCKS <pubg.service.care@gmail.com>"
 RESEND_API_KEY = "re_WKHZo6hq_4kJxSSS22gBzvDu9W8NhKMRp"
 NEON_DATABASE_URL = "postgresql://neondb_owner:npg_wWgxVo98zliD@ep-frosty-butterfly-aonbhjrs.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+SITE_URL = "https://www.codexstocks.org"
 
 [userenv.development]
