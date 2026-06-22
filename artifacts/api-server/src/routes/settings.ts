@@ -154,7 +154,7 @@ router.post("/settings/test-neon-connection", requireAdmin, async (req, res): Pr
 
 // ─── Env Check — shows status of all required env vars (admin only) ──────────
 
-router.get("/admin/env-check", requireAdmin, (_req, res): void => {
+router.get("/admin/env-check", requireAdmin, async (_req, res): Promise<void> => {
   const has = (key: string) => !!process.env[key]?.trim();
 
   const hasNeon = has("NEON_DATABASE_URL");
@@ -163,14 +163,37 @@ router.get("/admin/env-check", requireAdmin, (_req, res): void => {
   const isProd = process.env.NODE_ENV === "production";
   const activeDbSource: string | null = hasNeon ? "NEON_DATABASE_URL" : hasDbUrl ? "DATABASE_URL" : null;
 
-  // NEON_DATABASE_URL is only "critical" if DATABASE_URL is also absent (no fallback).
+  // ── GCS status from DB (GCS is configured via Admin Settings, not env vars) ─
+  let storageProvider = "local";
+  let gcsConfiguredInDb = false;
+  let gcsBucketName: string | null = null;
+  try {
+    const [s] = await db
+      .select({
+        storageProvider: settingsTable.storageProvider,
+        gcsBucketName: settingsTable.gcsBucketName,
+        gcsPrivateKey: settingsTable.gcsPrivateKey,
+        gcsKeyJson: settingsTable.gcsKeyJson,
+      })
+      .from(settingsTable)
+      .limit(1);
+    if (s) {
+      storageProvider = s.storageProvider ?? "local";
+      gcsBucketName = s.gcsBucketName ?? null;
+      gcsConfiguredInDb =
+        storageProvider === "gcs" &&
+        !!(s.gcsBucketName && (s.gcsPrivateKey || s.gcsKeyJson));
+    }
+  } catch {
+    // DB unavailable — show unknown
+  }
+
+  // ── Category helpers ──────────────────────────────────────────────────────
+  // NEON_DATABASE_URL: only "critical" when DATABASE_URL is also absent.
   const neonCategory: "critical" | "feature" | "optional" = hasDbUrl ? "feature" : "critical";
-  // DATABASE_URL is "critical" when it is the active DB source (NEON not set).
+  // DATABASE_URL: "critical" only when it is the sole active DB source.
   const dbUrlCategory: "critical" | "feature" | "optional" = hasNeon ? "optional" : "critical";
-  // SITE_URL: required in production for SEO/sitemap; optional in development.
-  const siteUrlCategory: "critical" | "feature" | "optional" = isProd ? "feature" : "optional";
-  // FRONTEND_URL: only needed in cross-origin mode. In same-origin deployment
-  // the backend serves the frontend directly, so CORS headers are never sent.
+  // FRONTEND_URL: not needed in same-origin mode (backend serves frontend directly).
   const frontendUrlCategory: "critical" | "feature" | "optional" = isSameOrigin ? "optional" : "feature";
 
   res.json({
@@ -185,8 +208,8 @@ router.get("/admin/env-check", requireAdmin, (_req, res): void => {
         category: neonCategory,
         label: "Neon Database URL" + (activeDbSource === "NEON_DATABASE_URL" ? " ← active" : ""),
         description: hasDbUrl
-          ? "Preferred Neon PostgreSQL URL. DATABASE_URL is the active fallback — DB is connected. Recommended: set this on Render for an explicit Neon instance."
-          : "Primary Neon PostgreSQL connection string. Neither NEON_DATABASE_URL nor DATABASE_URL is set — app will crash on startup.",
+          ? "DATABASE_URL is the active DB connection — app is fully connected. NEON_DATABASE_URL is optional but recommended for an explicit Neon instance on Render."
+          : "Neither NEON_DATABASE_URL nor DATABASE_URL is set — app will crash on startup. Set at least one.",
       },
       {
         key: "SESSION_SECRET",
@@ -201,67 +224,78 @@ router.get("/admin/env-check", requireAdmin, (_req, res): void => {
         set: has("RESEND_API_KEY"),
         category: "feature",
         label: "Resend API Key",
-        description: "API key from resend.com. Required for OTP, welcome, and password-reset emails. Get it from resend.com/api-keys.",
+        description: "Required for OTP emails, welcome emails, and password resets. Get it from resend.com/api-keys.",
       },
       {
         key: "SAME_ORIGIN_DEPLOYMENT",
         set: has("SAME_ORIGIN_DEPLOYMENT"),
         category: "feature",
-        label: "Same Origin Deployment",
-        description: "Set to 'true' on Render so the backend serves the frontend — fixes iOS Safari login and removes the need for FRONTEND_URL (CORS).",
-      },
-      {
-        key: "SITE_URL",
-        set: has("SITE_URL"),
-        category: siteUrlCategory,
-        label: "Site URL",
-        description: has("SITE_URL")
-          ? `Set to: ${process.env.SITE_URL} — used in sitemap.xml, SEO canonical tags, and structured data.`
-          : isProd
-          ? "Canonical domain e.g. https://www.codexstocks.org — required in production for sitemap.xml and SEO canonical tags."
-          : "Canonical domain e.g. https://www.codexstocks.org — optional in development, required in production for SEO.",
+        label: "Same-Origin Deployment",
+        description: "Set to 'true' on Render — backend serves the frontend directly, fixing iOS Safari login and making FRONTEND_URL (CORS) unnecessary.",
       },
       {
         key: "GOOGLE_CLIENT_ID",
         set: has("GOOGLE_CLIENT_ID"),
         category: "feature",
-        label: "Google OAuth Client ID (login only)",
-        description: "Enables 'Continue with Google' sign-in button. NOTE: This is ONLY for Google OAuth login — it has NO relation to Google Cloud Storage (GCS). Images go to GCS via GCS_BUCKET + GCS_CREDENTIALS, which are separate.",
+        label: "Google OAuth Client ID  (login only)",
+        description:
+          "Enables 'Continue with Google' sign-in button on login/signup pages. " +
+          "⚠️ This is ONLY for Google social login — it is completely unrelated to Google Cloud Storage. " +
+          "GCS (image uploads) is configured in Admin → Settings → File Storage, not via this env var.",
       },
       {
         key: "FRONTEND_URL",
         set: has("FRONTEND_URL"),
         category: frontendUrlCategory,
-        label: "Frontend URL (CORS)",
+        label: "Frontend URL  (CORS)",
         description: isSameOrigin
-          ? "Not needed — SAME_ORIGIN_DEPLOYMENT=true means the backend serves the frontend directly. CORS headers are never sent for same-origin requests."
-          : "Comma-separated allowed CORS origins e.g. https://www.codexstocks.org. Required in cross-origin mode (separate frontend + backend domains).",
+          ? "✅ Not needed — SAME_ORIGIN_DEPLOYMENT=true means the backend serves the frontend. No cross-origin requests, no CORS headers required."
+          : "Comma-separated allowed CORS origins e.g. https://www.codexstocks.org. Required when frontend and backend are on separate domains.",
       },
-      // ── Optional ─────────────────────────────────────────────────────────
+      // ── Optional — always have a working default ─────────────────────────
+      {
+        key: "SITE_URL",
+        set: has("SITE_URL"),
+        badge: has("SITE_URL") ? "✓ SET" : "✓ DEFAULT",
+        badgeOk: true,
+        category: "optional",
+        label: "Site URL",
+        description: has("SITE_URL")
+          ? `Set to: ${process.env.SITE_URL} — sitemap.xml, SEO canonical tags, and structured data use this.`
+          : "Using built-in default: https://www.codexstocks.org — sitemap.xml and SEO tags work correctly. Set this env var only to change the domain.",
+      },
       {
         key: "DATABASE_URL",
         set: hasDbUrl,
         category: dbUrlCategory,
-        label: "Database URL (Replit / fallback)" + (activeDbSource === "DATABASE_URL" ? " ← active" : ""),
+        label: "Database URL" + (activeDbSource === "DATABASE_URL" ? " ← active" : " (fallback)"),
         description: hasNeon
-          ? "Replit-managed PostgreSQL. NEON_DATABASE_URL takes priority — this is unused."
+          ? "NEON_DATABASE_URL takes priority — this fallback is unused."
           : hasDbUrl
-          ? "Active database connection. Set NEON_DATABASE_URL on Render for a dedicated Neon instance."
-          : "Replit auto-provisions this. Not present in this environment.",
+          ? "Active DB connection. Optionally set NEON_DATABASE_URL on Render for an explicit Neon instance."
+          : "Not present in this environment.",
       },
       {
-        key: "GCS_BUCKET",
-        set: has("GCS_BUCKET"),
+        key: "STORAGE_PROVIDER",
+        set: gcsConfiguredInDb || storageProvider === "local",
+        badge: gcsConfiguredInDb
+          ? "✓ GCS ACTIVE"
+          : storageProvider === "gcs"
+          ? "⚠ INCOMPLETE"
+          : "✓ LOCAL",
+        badgeOk: gcsConfiguredInDb || storageProvider === "local",
         category: "optional",
-        label: "GCS Bucket (image storage)",
-        description: "Google Cloud Storage bucket name for persistent image storage. Completely separate from GOOGLE_CLIENT_ID (OAuth). Uses local filesystem if not set.",
-      },
-      {
-        key: "GCS_CREDENTIALS",
-        set: has("GCS_CREDENTIALS"),
-        category: "optional",
-        label: "GCS Credentials (service account)",
-        description: "Base64-encoded GCS service account JSON. This is a server-to-server credential — separate from GOOGLE_CLIENT_ID which is for user login only.",
+        label: gcsConfiguredInDb
+          ? `Storage: Google Cloud Storage  (bucket: ${gcsBucketName ?? "set"})`
+          : storageProvider === "gcs"
+          ? "Storage: GCS — credentials incomplete"
+          : "Storage: Local Filesystem",
+        description: gcsConfiguredInDb
+          ? "GCS is active — images are stored persistently in Google Cloud Storage. Configured via Admin → Settings → File Storage (NOT via env vars — GOOGLE_CLIENT_ID is for OAuth login only)."
+          : storageProvider === "gcs"
+          ? "Storage is set to GCS but credentials are incomplete. Go to Admin → Settings → File Storage to finish setup."
+          : "Using local filesystem — uploaded images will be lost on Render redeploy. To enable GCS: Admin → Settings → File Storage. " +
+            "⚠️ GCS credentials are set via Admin Settings panel (NOT env vars). GOOGLE_CLIENT_ID is unrelated — it is only for Google social login.",
       },
     ],
   });
@@ -283,7 +317,36 @@ router.get("/admin/system-health", requireAdmin, async (_req, res): Promise<void
 
   const emailConfigured = has("RESEND_API_KEY");
   const sessionOk = has("SESSION_SECRET");
-  const gcsConfigured = has("GCS_BUCKET") && has("GCS_CREDENTIALS");
+  // GCS is configured via DB Admin Settings (not env vars) — query DB for real status
+  let gcsConfiguredInDb = false;
+  let dbStorageProvider = "local";
+  let dbGcsBucketName: string | null = null;
+  try {
+    const [s] = await db
+      .select({
+        storageProvider: settingsTable.storageProvider,
+        gcsBucketName: settingsTable.gcsBucketName,
+        gcsPrivateKey: settingsTable.gcsPrivateKey,
+        gcsKeyJson: settingsTable.gcsKeyJson,
+      })
+      .from(settingsTable)
+      .limit(1);
+    if (s) {
+      dbStorageProvider = s.storageProvider ?? "local";
+      dbGcsBucketName = s.gcsBucketName ?? null;
+      gcsConfiguredInDb =
+        dbStorageProvider === "gcs" &&
+        !!(s.gcsBucketName && (s.gcsPrivateKey || s.gcsKeyJson));
+    }
+  } catch {
+    // DB query failed — leave as local
+  }
+
+  const storageLabel = gcsConfiguredInDb
+    ? `Google Cloud Storage (bucket: ${dbGcsBucketName ?? "set"})`
+    : dbStorageProvider === "gcs"
+    ? "GCS (credentials incomplete)"
+    : "Local filesystem";
 
   res.json({
     timestamp: new Date().toISOString(),
@@ -308,11 +371,13 @@ router.get("/admin/system-health", requireAdmin, async (_req, res): Promise<void
         : "SESSION_SECRET missing — user sessions will break",
     },
     storage: {
-      ok: gcsConfigured,
-      provider: gcsConfigured ? "Google Cloud Storage" : "Local filesystem",
-      message: gcsConfigured
-        ? "GCS configured — uploads are persistent"
-        : "Using local filesystem — uploaded images will be lost on redeploy",
+      ok: gcsConfiguredInDb || dbStorageProvider === "local",
+      provider: storageLabel,
+      message: gcsConfiguredInDb
+        ? `GCS active — images are persistent (bucket: ${dbGcsBucketName ?? "set"})`
+        : dbStorageProvider === "gcs"
+        ? "GCS selected but credentials incomplete — go to Admin → Settings → File Storage"
+        : "Using local filesystem — images will be lost on redeploy. Configure GCS in Admin → Settings → File Storage.",
     },
   });
 });

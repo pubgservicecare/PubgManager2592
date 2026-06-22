@@ -269,7 +269,7 @@ app.get("/sitemap.xml", async (req, res) => {
   try {
     const origin =
       process.env.SITE_URL?.replace(/\/$/, "") ||
-      `${req.protocol}://${req.headers.host}`;
+      "https://www.codexstocks.org";
 
     // Fetch all active, publicly visible, non-deleted accounts that have slugs
     const activeAccounts = await db

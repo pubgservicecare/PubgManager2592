@@ -13,6 +13,8 @@ interface EnvVar {
   category: "critical" | "feature" | "optional";
   label: string;
   description: string;
+  badge?: string;
+  badgeOk?: boolean;
 }
 
 interface EnvCheckData {
@@ -272,8 +274,12 @@ export function AdminEnvCheck() {
                         <code className="text-sm font-bold text-foreground bg-secondary px-2 py-0.5 rounded-lg">
                           {v.key}
                         </code>
-                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${v.set ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" : cat.missingBadge}`}>
-                          {v.set ? "✓ SET" : "✗ MISSING"}
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                          v.badge
+                            ? (v.badgeOk ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" : "bg-orange-500/10 text-orange-300 border-orange-500/20")
+                            : v.set ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" : cat.missingBadge
+                        }`}>
+                          {v.badge ?? (v.set ? "✓ SET" : "✗ MISSING")}
                         </span>
                         {v.label.includes("← active") && v.set && (
                           <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20">
