@@ -19,6 +19,101 @@ interface HomeReview {
   createdAt: string;
 }
 
+function AccountCard({ account, index }: { account: any; index: number }) {
+  const imgs = (account.imageUrls ?? []) as string[];
+  const gradient = pickGradient(account.id);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: Math.min(index * 0.06, 0.4) }}
+    >
+      <Link href={`/account/${account.slug || account.id}`}>
+        <div className="group relative overflow-hidden rounded-xl border border-[#1E293B] bg-[#11151E] hover:border-orange-500/30 hover:shadow-[0_0_20px_rgba(249,115,22,0.08)] transition-all duration-300 flex flex-col h-full cursor-pointer active:scale-[0.99]">
+          <div className="relative aspect-[4/3] w-full overflow-hidden">
+            <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-80`} />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-[#11151E]/60 to-[#11151E]" />
+            <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
+              {account.videoUrl ? (
+                <div className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white">
+                  <Play className="w-5 h-5 ml-1" />
+                </div>
+              ) : (
+                <span className="font-display text-xl font-black italic tracking-tighter text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] -rotate-3 group-hover:scale-110 transition-transform duration-500 line-clamp-2">
+                  {account.title}
+                </span>
+              )}
+            </div>
+            {imgs.length > 0 && (
+              <>
+                <img
+                  src={`/api/storage${imgs[0]}`}
+                  alt={`${account.title} — Buy PUBG Mobile Account`}
+                  loading="lazy"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#11151E] via-[#11151E]/30 to-transparent pointer-events-none" />
+              </>
+            )}
+            {imgs.length > 1 && (
+              <div className="absolute bottom-3 right-12 z-10 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                +{imgs.length - 1}
+              </div>
+            )}
+            <div className="absolute right-3 top-3 z-10" onClick={(e) => e.preventDefault()}>
+              <WishlistButton accountId={account.id} />
+            </div>
+            <div className="absolute left-3 top-3 z-10 flex flex-col gap-1.5 items-start">
+              <span className="bg-black/55 text-[10px] font-bold text-white backdrop-blur-md border border-white/10 rounded-md px-2 py-0.5">
+                #{account.accountId}
+              </span>
+              {account.isFeatured && (
+                <span className="inline-flex items-center bg-orange-500/95 text-[10px] font-bold text-white shadow-[0_0_10px_rgba(249,115,22,0.4)] rounded-md px-2 py-0.5">
+                  <Star className="mr-1 h-3 w-3 fill-white" /> Featured
+                </span>
+              )}
+            </div>
+            <div className="absolute bottom-3 left-3 z-10">
+              <span className="inline-flex items-center bg-yellow-500/20 text-[10px] font-bold text-yellow-400 backdrop-blur-md border border-yellow-500/20 rounded-md px-2 py-0.5">
+                <Zap className="mr-1 h-3 w-3 fill-yellow-400" /> Instant
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-1 flex-col p-4">
+            <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-slate-100 group-hover:text-orange-400 transition-colors mb-3 min-h-[2.5rem]">
+              {account.title}
+            </h3>
+            <div className="mt-auto flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <div className="h-6 w-6 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center text-[10px] font-bold shrink-0">P</div>
+                <div className="flex flex-col overflow-hidden">
+                  <div className="flex items-center gap-1">
+                    <span className="truncate text-xs font-medium text-slate-300">{account.sellerUsername || "Verified Seller"}</span>
+                    <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                    <Star className="h-2.5 w-2.5 fill-orange-400 text-orange-400" />
+                    <span className="text-orange-400 font-bold">Trusted Seller</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between border-t border-[#1E293B] pt-3">
+                <span className="text-lg sm:text-xl font-bold tracking-tight text-orange-500 truncate">
+                  Rs {Number(account.priceForSale ?? 0).toLocaleString("en-PK")}
+                </span>
+                <span className="text-[11px] font-bold text-slate-300 group-hover:text-orange-400 transition-colors inline-flex items-center gap-1 shrink-0">
+                  View <ChevronRight className="w-3.5 h-3.5" />
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Link>
+    </motion.div>
+  );
+}
+
 export function PublicHome() {
   const { data: accounts, isLoading } = useListAccounts({ status: "active", public: true, sort: "newest" } as any);
   const { data: settings } = useGetSettings();
@@ -45,8 +140,11 @@ export function PublicHome() {
     isHomepage: true,
   });
 
-  // Show only first 5 accounts
-  const top5 = (accounts ?? []).slice(0, 5);
+  const allAccounts = accounts ?? [];
+  const featuredAccounts = allAccounts.filter((a) => !!(a as any).isFeatured);
+  const nonFeaturedAccounts = allAccounts.filter((a) => !(a as any).isFeatured);
+  // Show only first 5 non-featured accounts on homepage
+  const top5 = nonFeaturedAccounts.slice(0, 5);
 
   return (
     <PublicLayout>
@@ -87,6 +185,37 @@ export function PublicHome() {
               )}
             </header>
 
+            {/* ── 🔥 Featured Accounts Section ──────────────────────── */}
+            {(isLoading || featuredAccounts.length > 0) && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-bold text-white flex items-center gap-2">
+                    <span className="text-base">🔥</span>
+                    Featured Accounts
+                  </h2>
+                  <Link href="/accounts">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-orange-400 hover:text-orange-300 transition-colors cursor-pointer">
+                      View All <ArrowRight className="w-3.5 h-3.5" />
+                    </span>
+                  </Link>
+                </div>
+
+                {isLoading ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="bg-[#11151E] rounded-xl aspect-[4/5] animate-pulse border border-[#1E293B]" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                    {featuredAccounts.map((account, index) => (
+                      <AccountCard key={account.id} account={account} index={index} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ── 5 Accounts Grid ─────────────────────────────────────── */}
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -115,101 +244,9 @@ export function PublicHome() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-                  {top5.map((account, index) => {
-                    const imgs = ((account as any).imageUrls ?? []) as string[];
-                    const gradient = pickGradient(account.id);
-                    return (
-                      <motion.div
-                        key={account.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.4, delay: Math.min(index * 0.06, 0.4) }}
-                      >
-                        <Link href={`/account/${(account as any).slug || account.id}`}>
-                          <div className="group relative overflow-hidden rounded-xl border border-[#1E293B] bg-[#11151E] hover:border-orange-500/30 hover:shadow-[0_0_20px_rgba(249,115,22,0.08)] transition-all duration-300 flex flex-col h-full cursor-pointer active:scale-[0.99]">
-                            <div className="relative aspect-[4/3] w-full overflow-hidden">
-                              <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-80`} />
-                              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-[#11151E]/60 to-[#11151E]" />
-                              <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-                                {account.videoUrl ? (
-                                  <div className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white">
-                                    <Play className="w-5 h-5 ml-1" />
-                                  </div>
-                                ) : (
-                                  <span className="font-display text-xl font-black italic tracking-tighter text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] -rotate-3 group-hover:scale-110 transition-transform duration-500 line-clamp-2">
-                                    {account.title}
-                                  </span>
-                                )}
-                              </div>
-                              {imgs.length > 0 && (
-                                <>
-                                  <img
-                                    src={`/api/storage${imgs[0]}`}
-                                    alt={`${account.title} — Buy PUBG Mobile Account`}
-                                    loading="lazy"
-                                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                  />
-                                  <div className="absolute inset-0 bg-gradient-to-t from-[#11151E] via-[#11151E]/30 to-transparent pointer-events-none" />
-                                </>
-                              )}
-                              {imgs.length > 1 && (
-                                <div className="absolute bottom-3 right-12 z-10 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                                  +{imgs.length - 1}
-                                </div>
-                              )}
-                              <div className="absolute right-3 top-3 z-10" onClick={(e) => e.preventDefault()}>
-                                <WishlistButton accountId={account.id} />
-                              </div>
-                              <div className="absolute left-3 top-3 z-10 flex flex-col gap-1.5 items-start">
-                                <span className="bg-black/55 text-[10px] font-bold text-white backdrop-blur-md border border-white/10 rounded-md px-2 py-0.5">
-                                  #{account.accountId}
-                                </span>
-                                {(account as any).isFeatured && (
-                                  <span className="inline-flex items-center bg-orange-500/95 text-[10px] font-bold text-white shadow-[0_0_10px_rgba(249,115,22,0.4)] rounded-md px-2 py-0.5">
-                                    <Star className="mr-1 h-3 w-3 fill-white" /> Featured
-                                  </span>
-                                )}
-                              </div>
-                              <div className="absolute bottom-3 left-3 z-10">
-                                <span className="inline-flex items-center bg-yellow-500/20 text-[10px] font-bold text-yellow-400 backdrop-blur-md border border-yellow-500/20 rounded-md px-2 py-0.5">
-                                  <Zap className="mr-1 h-3 w-3 fill-yellow-400" /> Instant
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex flex-1 flex-col p-4">
-                              <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-slate-100 group-hover:text-orange-400 transition-colors mb-3 min-h-[2.5rem]">
-                                {account.title}
-                              </h3>
-                              <div className="mt-auto flex flex-col gap-3">
-                                <div className="flex items-center gap-2">
-                                  <div className="h-6 w-6 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center text-[10px] font-bold shrink-0">P</div>
-                                  <div className="flex flex-col overflow-hidden">
-                                    <div className="flex items-center gap-1">
-                                      <span className="truncate text-xs font-medium text-slate-300">{(account as any).sellerUsername || "Verified Seller"}</span>
-                                      <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                                    </div>
-                                    <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                                      <Star className="h-2.5 w-2.5 fill-orange-400 text-orange-400" />
-                                      <span className="text-orange-400 font-bold">Trusted Seller</span>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center justify-between border-t border-[#1E293B] pt-3">
-                                  <span className="text-lg sm:text-xl font-bold tracking-tight text-orange-500 truncate">
-                                    Rs {Number(account.priceForSale ?? 0).toLocaleString("en-PK")}
-                                  </span>
-                                  <span className="text-[11px] font-bold text-slate-300 group-hover:text-orange-400 transition-colors inline-flex items-center gap-1 shrink-0">
-                                    View <ChevronRight className="w-3.5 h-3.5" />
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </Link>
-                      </motion.div>
-                    );
-                  })}
+                  {top5.map((account, index) => (
+                    <AccountCard key={account.id} account={account} index={index} />
+                  ))}
                 </div>
               )}
 
@@ -286,7 +323,7 @@ export function PublicHome() {
                               </Link>
                             </div>
                           </div>
-                          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" title="Verified Review" />
+                          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" aria-label="Verified Review" />
                         </div>
                       </motion.div>
                     );

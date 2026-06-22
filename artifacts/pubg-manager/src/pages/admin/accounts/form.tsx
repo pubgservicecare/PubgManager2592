@@ -2,9 +2,10 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { useCreateAccount, useGetAccount, useUpdateAccount } from "@workspace/api-client-react";
 import { useLocation, useRoute } from "wouter";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Star } from "lucide-react";
 import { Link } from "wouter";
 import { MultiImageUploadField } from "@/components/MultiImageUploadField";
+import { apiUrl } from "@/lib/api-url";
 
 export function AdminAccountForm() {
   const [, params] = useRoute("/admin/accounts/:id/edit");
@@ -25,6 +26,9 @@ export function AdminAccountForm() {
     description: ""
   });
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [isFeatured, setIsFeatured] = useState(false);
+  const [featuredOrder, setFeaturedOrder] = useState("");
+  const [featureBusy, setFeatureBusy] = useState(false);
 
   useEffect(() => {
     if (account && isEdit) {
@@ -39,8 +43,28 @@ export function AdminAccountForm() {
         description: account.description || ""
       });
       setImageUrls((account as any).imageUrls || []);
+      setIsFeatured(!!(account as any).isFeatured);
+      setFeaturedOrder((account as any).featuredOrder?.toString() ?? "");
     }
   }, [account, isEdit]);
+
+  const saveFeatured = async () => {
+    if (!isEdit) return;
+    setFeatureBusy(true);
+    try {
+      await fetch(apiUrl(`/api/accounts/${accountId}/feature`), {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isFeatured,
+          featuredOrder: featuredOrder !== "" ? Number(featuredOrder) : null,
+        }),
+      });
+    } finally {
+      setFeatureBusy(false);
+    }
+  };
 
   const createMutation = useCreateAccount({
     mutation: {
@@ -166,6 +190,57 @@ export function AdminAccountForm() {
               <label className="text-sm font-bold text-muted-foreground uppercase">Description</label>
               <textarea rows={5} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-background border border-border focus:border-primary rounded-xl px-4 py-3 text-white outline-none resize-none" placeholder="Inventory details, rare items..." />
             </div>
+
+            {isEdit && (
+              <div className="space-y-4 p-5 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+                <div className="flex items-center gap-2 mb-1">
+                  <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                  <span className="text-sm font-bold text-amber-300 uppercase tracking-wider">Homepage Pinning</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsFeatured((v) => !v)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 ${
+                      isFeatured ? "bg-amber-500 border-amber-500" : "bg-secondary border-border"
+                    }`}
+                    role="switch"
+                    aria-checked={isFeatured}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg transform transition-transform duration-200 mt-0.5 ${
+                        isFeatured ? "translate-x-5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                  <label className="text-sm font-semibold text-white cursor-pointer" onClick={() => setIsFeatured((v) => !v)}>
+                    {isFeatured ? "Pinned to homepage" : "Not featured"}
+                  </label>
+                </div>
+                {isFeatured && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-muted-foreground uppercase">Display Order <span className="normal-case text-muted-foreground/60 font-normal">(lower = first, leave blank for auto)</span></label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={featuredOrder}
+                      onChange={(e) => setFeaturedOrder(e.target.value)}
+                      className="w-full sm:w-40 bg-background border border-border focus:border-amber-500 rounded-xl px-4 py-2.5 text-white outline-none"
+                      placeholder="e.g. 1"
+                    />
+                  </div>
+                )}
+                <button
+                  type="button"
+                  disabled={featureBusy}
+                  onClick={saveFeatured}
+                  className="inline-flex items-center gap-2 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-bold px-5 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50"
+                >
+                  <Star className={`w-4 h-4 ${isFeatured ? "fill-amber-300" : ""}`} />
+                  {featureBusy ? "Saving..." : "Save Featured Settings"}
+                </button>
+              </div>
+            )}
 
             <div className="pt-4 border-t border-border/50">
               <button disabled={isPending} type="submit" className="w-full sm:w-auto flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-8 py-4 rounded-xl transition-all active:scale-95 disabled:opacity-50">
