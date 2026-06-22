@@ -157,17 +157,30 @@ router.post("/settings/test-neon-connection", requireAdmin, async (req, res): Pr
 router.get("/admin/env-check", requireAdmin, (_req, res): void => {
   const has = (key: string) => !!process.env[key]?.trim();
 
+  const hasNeon = has("NEON_DATABASE_URL");
+  const hasDbUrl = has("DATABASE_URL");
+  const activeDbSource: string | null = hasNeon ? "NEON_DATABASE_URL" : hasDbUrl ? "DATABASE_URL" : null;
+
+  // NEON_DATABASE_URL is only "critical" if DATABASE_URL is also absent (no fallback).
+  // If DATABASE_URL exists as fallback, NEON is merely the preferred/recommended choice.
+  const neonCategory: "critical" | "feature" | "optional" = hasDbUrl ? "feature" : "critical";
+  // DATABASE_URL is "critical" when it is the active DB source (NEON not set).
+  const dbUrlCategory: "critical" | "feature" | "optional" = hasNeon ? "optional" : "critical";
+
   res.json({
     nodeEnv: process.env.NODE_ENV || "development",
     isProduction: process.env.NODE_ENV === "production",
+    activeDbSource,
     vars: [
       // ── Critical — app won't work without these ──────────────────────────
       {
         key: "NEON_DATABASE_URL",
-        set: has("NEON_DATABASE_URL"),
-        category: "critical",
-        label: "Neon Database URL",
-        description: "Primary Neon PostgreSQL connection string. Takes priority over DATABASE_URL. App won't start without a DB.",
+        set: hasNeon,
+        category: neonCategory,
+        label: "Neon Database URL" + (activeDbSource === "NEON_DATABASE_URL" ? " ← active" : ""),
+        description: hasDbUrl
+          ? `Recommended explicit Neon PostgreSQL URL. Currently using DATABASE_URL as the active connection — app is connected. Set this on Render for a dedicated Neon instance.`
+          : "Primary Neon PostgreSQL connection string. App uses DATABASE_URL as fallback, but neither is set — app will crash on startup.",
       },
       {
         key: "SESSION_SECRET",
@@ -177,6 +190,13 @@ router.get("/admin/env-check", requireAdmin, (_req, res): void => {
         description: "Random 32+ character string for signing user sessions. Login will not work without this.",
       },
       // ── Feature — needed for specific features ───────────────────────────
+      {
+        key: "RESEND_API_KEY",
+        set: has("RESEND_API_KEY"),
+        category: "feature",
+        label: "Resend API Key",
+        description: "API key from resend.com. Used to send OTP, welcome, password-reset, and transactional emails. Get it from resend.com/api-keys.",
+      },
       {
         key: "GOOGLE_CLIENT_ID",
         set: has("GOOGLE_CLIENT_ID"),
@@ -205,7 +225,18 @@ router.get("/admin/env-check", requireAdmin, (_req, res): void => {
         label: "Frontend URL (CORS)",
         description: "Comma-separated allowed CORS origins. Only needed in cross-origin mode (separate frontend + backend domains).",
       },
-      // ── Optional — for advanced features ────────────────────────────────
+      // ── Optional ─────────────────────────────────────────────────────────
+      {
+        key: "DATABASE_URL",
+        set: hasDbUrl,
+        category: dbUrlCategory,
+        label: "Database URL (Replit / fallback)" + (activeDbSource === "DATABASE_URL" ? " ← active" : ""),
+        description: hasNeon
+          ? "Replit-managed PostgreSQL fallback. NEON_DATABASE_URL takes priority — this is unused."
+          : hasDbUrl
+          ? "Active database connection. Set NEON_DATABASE_URL on Render for an explicit Neon instance."
+          : "Replit auto-provisions this. Not present in this environment.",
+      },
       {
         key: "GCS_BUCKET",
         set: has("GCS_BUCKET"),
@@ -220,22 +251,57 @@ router.get("/admin/env-check", requireAdmin, (_req, res): void => {
         label: "GCS Credentials",
         description: "Base64-encoded Google Cloud service account JSON. Required for GCS image uploads.",
       },
-      {
-        key: "DATABASE_URL",
-        set: has("DATABASE_URL"),
-        category: "optional",
-        label: "Database URL (Replit fallback)",
-        description: "Replit-managed PostgreSQL. Used automatically as fallback if NEON_DATABASE_URL is not set.",
-      },
-      // ── Email / Resend ────────────────────────────────────────────────────
-      {
-        key: "RESEND_API_KEY",
-        set: has("RESEND_API_KEY"),
-        category: "feature",
-        label: "Resend API Key",
-        description: "API key from resend.com. Used to send OTP, welcome, password-reset, and transactional emails. Get it from resend.com/api-keys.",
-      },
     ],
+  });
+});
+
+// ─── System Health — runs all live connectivity tests (admin only) ────────────
+
+router.get("/admin/system-health", requireAdmin, async (_req, res): Promise<void> => {
+  const has = (key: string) => !!process.env[key]?.trim();
+
+  const hasNeon = has("NEON_DATABASE_URL");
+  const hasDbUrl = has("DATABASE_URL");
+  const activeDbSource = hasNeon ? "NEON_DATABASE_URL" : hasDbUrl ? "DATABASE_URL" : null;
+  const dbUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || "";
+
+  const dbResult = dbUrl
+    ? await testDatabaseUrl(dbUrl)
+    : { ok: false, error: "No database URL configured." };
+
+  const emailConfigured = has("RESEND_API_KEY");
+  const sessionOk = has("SESSION_SECRET");
+  const gcsConfigured = has("GCS_BUCKET") && has("GCS_CREDENTIALS");
+
+  res.json({
+    timestamp: new Date().toISOString(),
+    db: {
+      ok: dbResult.ok,
+      source: activeDbSource,
+      message: dbResult.ok
+        ? `Connected via ${activeDbSource}`
+        : dbResult.error || "Connection failed",
+    },
+    email: {
+      ok: emailConfigured,
+      provider: emailConfigured ? "Resend" : null,
+      message: emailConfigured
+        ? "Resend configured — emails will be delivered"
+        : "RESEND_API_KEY not set — OTP and transactional emails are disabled",
+    },
+    session: {
+      ok: sessionOk,
+      message: sessionOk
+        ? "SESSION_SECRET set — logins are secure"
+        : "SESSION_SECRET missing — user sessions will break",
+    },
+    storage: {
+      ok: gcsConfigured,
+      provider: gcsConfigured ? "Google Cloud Storage" : "Local filesystem",
+      message: gcsConfigured
+        ? "GCS configured — uploads are persistent"
+        : "Using local filesystem — uploaded images will be lost on redeploy",
+    },
   });
 });
 
