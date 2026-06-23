@@ -1,0 +1,44 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "DvR1fRisSXkyME9g73yCl"
+uri = "file://artifacts/mockup-sandbox/public/images/pubg-hero.png"
+type = "image"
+title = "PUBG Cinematic Hero Background"
+
+[[generated]]
+id = "QPVl-BYokMpWbVeOr-hoB"
+uri = "file://artifacts/mockup-sandbox/public/images/hero-m416.png"
+type = "image"
+title = "Ice assault rifle"
+
+[[generated]]
+id = "DlUPLABYlI2nlOfTSoYS7"
+uri = "file://artifacts/mockup-sandbox/public/images/side1-glacier.png"
+type = "image"
+title = "Ice character portrait"
+
+[[generated]]
+id = "ZhBPUIBn03WP-ivnDL2R3"
+uri = "file://artifacts/mockup-sandbox/public/images/side2-fool.png"
+type = "image"
+title = "Sports car"
+
+[[generated]]
+id = "vB89DkIBH_MFiRj7jxmFl"
+uri = "file://artifacts/mockup-sandbox/public/images/side3-cheap.png"
+type = "image"
+title = "Tactical gear collection"
+
+[[generated]]
+id = "-6nwnZ3fA3ScOem0i4bMQ"
+uri = "file://artifacts/mockup-sandbox/public/images/grid1.png"
+type = "image"
+title = "Loaded account gear"
+
+[[generated]]
+id = "jgbPItB-rym2BCatpQw1O"
+uri = "file://artifacts/mockup-sandbox/public/images/grid2.png"
+type = "image"
+title = "Mythic set character"
