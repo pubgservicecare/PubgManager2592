@@ -5,6 +5,7 @@ import { requireAdmin } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLog";
 import { sendPurchaseConfirmationEmail } from "../lib/email";
 import { generateUniqueSlug } from "../lib/slugify";
+import { getCache, setCache, invalidateCache, CACHE_KEYS, TTL } from "../lib/cache";
 
 const router: IRouter = Router();
 
@@ -243,6 +244,14 @@ router.get("/accounts", async (req, res): Promise<void> => {
   // const page = Math.max(1, parseInt((req.query.page as string) || "1", 10));
   // const limit = Math.min(100, Math.max(1, parseInt((req.query.limit as string) || "9999", 10)));
 
+  if (isPublic) {
+    const cached = getCache(CACHE_KEYS.ACCOUNTS_PUBLIC);
+    if (cached !== null) {
+      res.json(cached);
+      return;
+    }
+  }
+
   // Phase 4: Move all filtering into SQL — never pull unneeded rows into Node
   const conditions: any[] = [isNull(accountsTable.deletedAt)];
   if (isPublic || !isAdmin) {
@@ -318,6 +327,7 @@ router.get("/accounts", async (req, res): Promise<void> => {
   const result = accounts.map((a) =>
     buildAccountListResponseFromMaps(a, !!(isAdmin && !isPublic), linksMap, paymentsMap, sellersMap),
   );
+  if (isPublic) setCache(CACHE_KEYS.ACCOUNTS_PUBLIC, result, TTL.ACCOUNTS_PUBLIC);
   res.json(result);
 });
 
@@ -378,6 +388,7 @@ router.patch("/accounts/:id/feature", requireAdmin, async (req, res): Promise<vo
     return;
   }
   await db.insert(historyTable).values({ accountId: id, action: `Featured updated`, details: JSON.stringify(updates) });
+  invalidateCache(CACHE_KEYS.ACCOUNTS_PUBLIC);
   res.json(await buildAccountResponse(updated, true));
 });
 
@@ -441,6 +452,7 @@ router.post("/accounts/bulk", requireAdmin, async (req, res): Promise<void> => {
     details: `${cleanIds.length} accounts`,
   });
 
+  invalidateCache(CACHE_KEYS.ACCOUNTS_PUBLIC);
   res.json({ ok: true, affected, action, ids: cleanIds });
 });
 
@@ -478,6 +490,7 @@ router.post("/accounts", requireAdmin, async (req, res): Promise<void> => {
     details: title,
   });
 
+  invalidateCache(CACHE_KEYS.ACCOUNTS_PUBLIC);
   res.status(201).json(await buildAccountResponse(account, true));
 });
 
@@ -561,6 +574,7 @@ router.patch("/accounts/:id", requireAdmin, async (req, res): Promise<void> => {
     details: Object.keys(updates).join(", "),
   });
 
+  invalidateCache(CACHE_KEYS.ACCOUNTS_PUBLIC);
   res.json(await buildAccountResponse(updated, true));
 });
 
@@ -596,6 +610,7 @@ router.patch("/accounts/:id/status", requireAdmin, async (req, res): Promise<voi
     details: `${existing.title}`,
   });
 
+  invalidateCache(CACHE_KEYS.ACCOUNTS_PUBLIC);
   res.json(await buildAccountResponse(updated, true));
 });
 
@@ -621,6 +636,7 @@ router.delete("/accounts/:id", requireAdmin, async (req, res): Promise<void> => 
     details: existing.title,
   });
 
+  invalidateCache(CACHE_KEYS.ACCOUNTS_PUBLIC);
   res.sendStatus(204);
 });
 
@@ -692,6 +708,7 @@ router.post("/accounts/:id/sell", requireAdmin, async (req, res): Promise<void> 
     })
     .catch(() => {});
 
+  invalidateCache(CACHE_KEYS.ACCOUNTS_PUBLIC);
   res.json(await buildAccountResponse(updated, true));
 });
 

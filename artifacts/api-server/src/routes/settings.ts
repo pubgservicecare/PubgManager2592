@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, settingsTable, testDatabaseUrl } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLog";
+import { getCache, setCache, invalidateCache, CACHE_KEYS, TTL } from "../lib/cache";
 import { sendRawEmail } from "../lib/email";
 import bcrypt from "bcryptjs";
 
@@ -69,11 +70,18 @@ async function getInitialAdminCredentials(): Promise<{ adminUsername: string; ad
 }
 
 router.get("/settings", async (_req, res): Promise<void> => {
+  const cached = getCache(CACHE_KEYS.SETTINGS);
+  if (cached !== null) {
+    res.json(cached);
+    return;
+  }
+
   let [settings] = await db.select().from(settingsTable).limit(1);
   if (!settings) {
     [settings] = await db.insert(settingsTable).values(await getInitialAdminCredentials()).returning();
   }
   const { adminPassword: _pw, ...safeSettings } = settings;
+  setCache(CACHE_KEYS.SETTINGS, safeSettings, TTL.SETTINGS);
   res.json(safeSettings);
 });
 
@@ -129,6 +137,7 @@ router.patch("/settings", requireAdmin, async (req, res): Promise<void> => {
   });
 
   const { adminPassword: _pw, ...safeSettings } = updated;
+  invalidateCache(CACHE_KEYS.SETTINGS);
   res.json(safeSettings);
 });
 

@@ -4,6 +4,7 @@ import { db, reviewsTable, customerUsersTable } from "@workspace/db";
 import { accountsTable } from "@workspace/db/schema";
 import { requireAdmin } from "../middlewares/auth";
 import { requireCustomer, getCustomerSession } from "../middlewares/customerAuth";
+import { getCache, setCache, invalidateCache, CACHE_KEYS, TTL } from "../lib/cache";
 
 const router: IRouter = Router();
 
@@ -54,6 +55,12 @@ router.get("/reviews", async (req, res): Promise<void> => {
 // ── Public: Home page featured reviews (platform only) ────────────────────
 router.get("/home-reviews", async (req, res): Promise<void> => {
   try {
+    const cached = getCache(CACHE_KEYS.HOME_REVIEWS);
+    if (cached !== null) {
+      res.json(cached);
+      return;
+    }
+
     const rows = await db
       .select({
         id: reviewsTable.id,
@@ -81,7 +88,9 @@ router.get("/home-reviews", async (req, res): Promise<void> => {
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
     }));
 
-    res.json({ reviews });
+    const payload = { reviews };
+    setCache(CACHE_KEYS.HOME_REVIEWS, payload, TTL.HOME_REVIEWS);
+    res.json(payload);
   } catch (err) {
     req.log.error({ err }, "home-reviews: failed to fetch");
     res.status(500).json({ error: "Failed to fetch home reviews" });
@@ -358,6 +367,7 @@ router.patch("/admin/reviews/:id", requireAdmin, async (req, res): Promise<void>
   try {
     const [updated] = await db.update(reviewsTable).set(updateData).where(eq(reviewsTable.id, id)).returning();
     if (!updated) { res.status(404).json({ error: "Review not found" }); return; }
+    invalidateCache(CACHE_KEYS.HOME_REVIEWS);
     res.json({ id: updated.id, approved: updated.approved, featuredOnHome: updated.featuredOnHome });
   } catch (err) {
     req.log.error({ err }, "admin reviews: failed to update");
@@ -373,6 +383,7 @@ router.delete("/admin/reviews/:id", requireAdmin, async (req, res): Promise<void
   try {
     const [deleted] = await db.delete(reviewsTable).where(eq(reviewsTable.id, id)).returning({ id: reviewsTable.id });
     if (!deleted) { res.status(404).json({ error: "Review not found" }); return; }
+    invalidateCache(CACHE_KEYS.HOME_REVIEWS);
     res.json({ success: true, id: deleted.id });
   } catch (err) {
     req.log.error({ err }, "admin reviews: failed to delete");
