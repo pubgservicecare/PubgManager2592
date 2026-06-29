@@ -35,6 +35,17 @@ fi
 npm install -g pnpm@10
 echo "pnpm version: $(pnpm --version)"
 
+# ─── Install yt-dlp ──────────────────────────────────────────────────────────
+#
+# Downloads the self-contained yt-dlp binary from the official GitHub release.
+# Placed in /usr/local/bin so it is on PATH at both build-time and runtime.
+#
+echo "Installing yt-dlp..."
+curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
+  -o /usr/local/bin/yt-dlp
+chmod +x /usr/local/bin/yt-dlp
+echo "yt-dlp version: $(yt-dlp --version)"
+
 # Install all dependencies
 pnpm install --no-frozen-lockfile
 
