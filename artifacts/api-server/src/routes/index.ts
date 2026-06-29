@@ -20,6 +20,7 @@ import shareRouter from "./share";
 import reviewsRouter from "./reviews";
 import emailAuthRouter from "./emailAuth";
 import emailCampaignsRouter from "./emailCampaigns";
+import ytDownloadRouter from "./ytDownload";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(shareRouter);
 router.use(reviewsRouter);
 router.use(emailAuthRouter);
 router.use(emailCampaignsRouter);
+router.use(ytDownloadRouter);
 
 export default router;
