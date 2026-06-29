@@ -34,8 +34,11 @@ const SYSTEM_CANDIDATES = [
 
 let YT_DLP: string = SYSTEM_CANDIDATES.find((p) => existsSync(p)) ?? "";
 
+// yt-dlp_linux is the self-contained PyInstaller build — no Python required.
+// Do NOT use the plain "yt-dlp" release; that is a Python zipapp and fails
+// on systems without python3 in PATH (e.g. Replit NixOS containers).
 const YT_DLP_URL =
-  "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
+  "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux";
 
 // ── Cookie authentication ──────────────────────────────────────────────────
 //

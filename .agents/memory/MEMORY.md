@@ -5,3 +5,4 @@
 - [Google OAuth auth](google-oauth-auth.md) — GIS token flow; customer_users extended; pg migration via node + lib/db/node_modules/pg.
 - [Email auth system](email-auth-system.md) — OTP-based email signup/reset; customerAuth.ts is the single place for set-password and link-google; use-customer-auth.ts is .ts not .tsx so no JSX allowed.
 - [Auth hardening](auth-hardening.md) — Production auth hardening: DB rate limiter, audit logs, soft delete, deleted_at guards, unlink-google, email update flow.
+- [yt-dlp binary on Replit](yt-dlp-binary.md) — Must use yt-dlp_linux (standalone), NOT plain yt-dlp (Python zipapp — fails: python3 not in PATH on NixOS).
