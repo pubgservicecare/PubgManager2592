@@ -4,16 +4,13 @@ import {
   Loader2,
   X,
   AlertCircle,
-  CheckCircle2,
-  Music2,
-  Video,
-  FileVideo,
-  FileAudio,
   ChevronDown,
   ChevronUp,
-  Star,
+  CheckCircle2,
 } from "lucide-react";
+import { useDownloadManager } from "@/hooks/use-download-manager";
 
+// ── Types ──────────────────────────────────────────────────────────────────
 interface VideoFormat {
   itag: string;
   qualityLabel: string;
@@ -37,195 +34,99 @@ interface VideoInfo {
   formats: VideoFormat[];
 }
 
-function formatBytes(bytes: number | null): string {
-  if (!bytes) return "";
-  if (bytes >= 1_048_576) return ` · ~${(bytes / 1_048_576).toFixed(0)} MB`;
-  if (bytes >= 1_024) return ` · ~${(bytes / 1_024).toFixed(0)} KB`;
-  return "";
+// Only show these heights, in this order. Download will always be .mp4.
+const ALLOWED_HEIGHTS = [1440, 1080, 720, 480] as const;
+type AllowedHeight = (typeof ALLOWED_HEIGHTS)[number];
+
+const HEIGHT_LABEL: Record<AllowedHeight, string> = {
+  1440: "2K / 1440p",
+  1080: "Full HD / 1080p",
+  720:  "HD / 720p",
+  480:  "SD / 480p",
+};
+
+function pickBestPerHeight(formats: VideoFormat[]): Map<AllowedHeight, VideoFormat> {
+  const map = new Map<AllowedHeight, VideoFormat>();
+  for (const fmt of formats) {
+    if (fmt.type !== "video") continue;
+    if (!(ALLOWED_HEIGHTS as readonly number[]).includes(fmt.height)) continue;
+    const h = fmt.height as AllowedHeight;
+    const existing = map.get(h);
+    if (!existing || (fmt.filesize ?? 0) > (existing.filesize ?? 0)) {
+      map.set(h, fmt);
+    }
+  }
+  return map;
 }
 
-function FormatRow({ fmt, url, title }: { fmt: VideoFormat; url: string; title: string }) {
-  const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
-  const [progress, setProgress] = useState(0);
-  const [errMsg, setErrMsg] = useState("");
-  const isAudio = fmt.type === "audio";
+// ── Format button ──────────────────────────────────────────────────────────
+function QualityButton({
+  height,
+  fmt,
+  videoUrl,
+  videoTitle,
+}: {
+  height: AllowedHeight;
+  fmt: VideoFormat;
+  videoUrl: string;
+  videoTitle: string;
+}) {
+  const { startDownload } = useDownloadManager();
+  const [added, setAdded] = useState(false);
 
-  const handleDownload = async () => {
-    if (state === "loading") return;
-    setState("loading");
-    setProgress(0);
-    setErrMsg("");
-
-    const params = new URLSearchParams({ url, itag: fmt.itag, type: fmt.type });
-    try {
-      const res = await fetch(`/api/yt-download?${params}`, { credentials: "include" });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        console.error("[yt-download] error response", { status: res.status, body });
-        if (res.status === 403) {
-          throw new Error(
-            "Server YouTube authentication failed. The server cookies are missing, expired, or invalid.",
-          );
-        }
-        throw new Error((body as any).error || `Server error ${res.status}`);
-      }
-
-      const contentLength = Number(res.headers.get("Content-Length") ?? 0);
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("Stream not available");
-
-      const chunks: Uint8Array[] = [];
-      let received = 0;
-
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        received += value.byteLength;
-        if (contentLength > 0) {
-          setProgress(Math.min(100, (received / contentLength) * 100));
-        } else {
-          setProgress((prev) => Math.min(95, prev + (100 - prev) * 0.05));
-        }
-      }
-
-      setProgress(100);
-
-      const disposition = res.headers.get("Content-Disposition") ?? "";
-      const match = disposition.match(/filename="?([^"]+)"?/);
-      const safeTitle = title.replace(/[^\w\s-]/gi, "").trim().slice(0, 60) || "download";
-      const filename = match?.[1] ?? `${safeTitle}.${fmt.container}`;
-
-      const blob = new Blob(chunks);
-      const objUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(objUrl);
-
-      setState("done");
-      setTimeout(() => { setState("idle"); setProgress(0); }, 5000);
-    } catch (e: any) {
-      setErrMsg(e.message || "Failed");
-      setState("error");
-      setProgress(0);
-      setTimeout(() => setState("idle"), 6000);
-    }
+  const handleClick = () => {
+    if (added) return;
+    startDownload({
+      url: videoUrl,
+      itag: fmt.itag,
+      type: "video",
+      title: videoTitle,
+      quality: `${height}p`,
+      container: "mp4",
+    });
+    setAdded(true);
+    setTimeout(() => setAdded(false), 3000);
   };
 
   return (
-    <div className={`rounded-lg border transition-colors ${
-      state === "loading"
-        ? "border-primary/40 bg-primary/5"
-        : state === "done"
-        ? "border-emerald-500/30 bg-emerald-500/5"
-        : state === "error"
-        ? "border-destructive/30 bg-destructive/5"
-        : "border-border bg-background hover:border-primary/30"
-    }`}>
-      <div className="flex items-center justify-between gap-2 px-3 py-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
-            isAudio ? "bg-violet-500/15 text-violet-400" : "bg-primary/15 text-primary"
-          }`}>
-            {isAudio ? <FileAudio className="w-3 h-3" /> : <FileVideo className="w-3 h-3" />}
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-bold text-white flex items-center gap-1.5">
-              {fmt.qualityLabel}
-              {fmt.isRecommended && (
-                <span className="text-[9px] font-black px-1 py-px rounded bg-primary/20 text-primary flex items-center gap-0.5">
-                  <Star className="w-2 h-2 fill-current" /> BEST
-                </span>
-              )}
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              {fmt.container.toUpperCase()}
-              {fmt.fps && fmt.fps > 30 ? ` · ${fmt.fps}fps` : ""}
-              {formatBytes(fmt.filesize)}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5 shrink-0">
-          {state === "error" && (
-            <span className="text-[10px] text-destructive max-w-[110px] truncate" title={errMsg}>
-              {errMsg}
-            </span>
-          )}
-          <button
-            onClick={handleDownload}
-            disabled={state === "loading"}
-            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
-              state === "done"
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                : state === "error"
-                ? "bg-destructive/20 text-destructive border border-destructive/30"
-                : state === "loading"
-                ? "bg-primary/10 text-primary/60 border border-primary/20 cursor-not-allowed"
-                : "bg-primary text-primary-foreground hover:bg-primary/90 border border-primary"
-            }`}
-          >
-            {state === "loading" && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
-            {state === "done" && <CheckCircle2 className="w-2.5 h-2.5" />}
-            {state === "error" && <AlertCircle className="w-2.5 h-2.5" />}
-            {state === "idle" && <Download className="w-2.5 h-2.5" />}
-            {state === "loading"
-              ? progress > 0 ? `${Math.round(progress)}%` : "…"
-              : state === "done"
-              ? "Done!"
-              : state === "error"
-              ? "Retry"
-              : "Get"}
-          </button>
-        </div>
+    <button
+      onClick={handleClick}
+      disabled={added}
+      className={`flex items-center justify-between w-full px-4 py-3 rounded-xl border font-bold text-sm transition-all ${
+        added
+          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 cursor-default"
+          : "border-border bg-background hover:border-primary/40 hover:bg-primary/5 text-white"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <span className={`text-xs font-black px-2 py-0.5 rounded-lg ${
+          added ? "bg-emerald-500/20 text-emerald-400" : "bg-primary/15 text-primary"
+        }`}>
+          {height}p
+        </span>
+        <span className="text-sm">{HEIGHT_LABEL[height]}</span>
       </div>
-
-      {state === "loading" && (
-        <div className="px-3 pb-2">
-          <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <p className="text-[9px] text-muted-foreground mt-1">
-            {progress === 0
-              ? "Processing on server…"
-              : progress < 100
-              ? `Downloading · ${Math.round(progress)}%`
-              : "Finalizing…"}
-          </p>
-        </div>
-      )}
-    </div>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span>MP4</span>
+        {added ? (
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        ) : (
+          <Download className="w-4 h-4 text-primary" />
+        )}
+      </div>
+    </button>
   );
 }
 
+// ── Main component ─────────────────────────────────────────────────────────
 export function YoutubeVideoDownloadButton({ videoUrl }: { videoUrl: string }) {
   const [open, setOpen] = useState(false);
-  const [state, setState] = useState<"idle" | "loading" | "error">("idle");
+  const [fetchState, setFetchState] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState("");
   const [info, setInfo] = useState<VideoInfo | null>(null);
-  const [showAllVideo, setShowAllVideo] = useState(false);
-  const [showAllAudio, setShowAllAudio] = useState(false);
 
-  const videoFormats = info?.formats.filter((f) => f.type === "video") ?? [];
-  const audioFormats = info?.formats.filter((f) => f.type === "audio") ?? [];
-  const visibleVideo = showAllVideo ? videoFormats : videoFormats.slice(0, 4);
-  const visibleAudio = showAllAudio ? audioFormats : audioFormats.slice(0, 2);
-
-  const handleOpen = async () => {
-    if (open) {
-      setOpen(false);
-      return;
-    }
-    setOpen(true);
-    if (info) return;
-    setState("loading");
+  const fetchInfo = async () => {
+    setFetchState("loading");
     setError("");
     try {
       const res = await fetch("/api/yt-info", {
@@ -237,35 +138,49 @@ export function YoutubeVideoDownloadButton({ videoUrl }: { videoUrl: string }) {
       const data = await res.json();
       console.error("[yt-info] response", { status: res.status, body: data });
       if (!res.ok) {
-        if (res.status === 403) {
+        if (res.status === 403)
           throw new Error(
             "Server YouTube authentication failed. The server cookies are missing, expired, or invalid.",
           );
-        }
         throw new Error(data.error || `Server error ${res.status}`);
       }
       setInfo(data as VideoInfo);
-      setState("idle");
+      setFetchState("idle");
     } catch (e: any) {
       setError(e.message || "Could not load formats.");
-      setState("error");
+      setFetchState("error");
     }
+  };
+
+  const handleOpen = async () => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    setOpen(true);
+    if (!info) await fetchInfo();
   };
 
   const handleRetry = () => {
     setInfo(null);
-    setState("idle");
+    setFetchState("idle");
     setError("");
-    handleOpen();
+    fetchInfo();
   };
+
+  const formatMap = info ? pickBestPerHeight(info.formats) : null;
+  const availableHeights = formatMap
+    ? ALLOWED_HEIGHTS.filter((h) => formatMap.has(h))
+    : [];
 
   return (
     <div className="mt-2">
+      {/* Trigger */}
       <button
         onClick={handleOpen}
         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-background border border-border hover:border-primary/50 text-white text-sm font-bold transition-all hover:bg-primary/5 group"
       >
-        {state === "loading" && !info ? (
+        {fetchState === "loading" && !info ? (
           <Loader2 className="w-4 h-4 animate-spin text-primary" />
         ) : (
           <Download className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
@@ -278,11 +193,15 @@ export function YoutubeVideoDownloadButton({ videoUrl }: { videoUrl: string }) {
         )}
       </button>
 
+      {/* Dropdown */}
       {open && (
         <div className="mt-2 rounded-2xl border border-border bg-card overflow-hidden shadow-xl">
+          {/* Panel header */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-background/50">
             <p className="text-xs font-bold text-white uppercase tracking-wider">
-              {info ? `${info.title.slice(0, 40)}${info.title.length > 40 ? "…" : ""}` : "Select Format"}
+              {info
+                ? `${info.title.slice(0, 38)}${info.title.length > 38 ? "…" : ""}`
+                : "Select Quality"}
             </p>
             <button
               onClick={() => setOpen(false)}
@@ -292,15 +211,17 @@ export function YoutubeVideoDownloadButton({ videoUrl }: { videoUrl: string }) {
             </button>
           </div>
 
-          <div className="p-3 space-y-3 max-h-[420px] overflow-y-auto">
-            {state === "loading" && !info && (
+          <div className="p-3 space-y-2">
+            {/* Loading */}
+            {fetchState === "loading" && !info && (
               <div className="flex flex-col items-center justify-center py-8 gap-2">
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                <p className="text-xs text-muted-foreground">Fetching available formats…</p>
+                <p className="text-xs text-muted-foreground">Fetching available qualities…</p>
               </div>
             )}
 
-            {state === "error" && (
+            {/* Error */}
+            {fetchState === "error" && (
               <div className="flex flex-col gap-3 p-3 rounded-xl bg-destructive/10 border border-destructive/25">
                 <div className="flex items-start gap-2 text-destructive text-xs">
                   <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
@@ -315,64 +236,26 @@ export function YoutubeVideoDownloadButton({ videoUrl }: { videoUrl: string }) {
               </div>
             )}
 
-            {info && (
+            {/* Quality buttons */}
+            {info && formatMap && (
               <>
-                {videoFormats.length > 0 && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-1.5 px-1">
-                      <Video className="w-3 h-3 text-primary" />
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                        Video ({videoFormats.length})
-                      </span>
-                    </div>
-                    {visibleVideo.map((fmt) => (
-                      <FormatRow key={fmt.itag} fmt={fmt} url={videoUrl} title={info.title} />
-                    ))}
-                    {videoFormats.length > 4 && (
-                      <button
-                        onClick={() => setShowAllVideo((v) => !v)}
-                        className="w-full flex items-center justify-center gap-1 py-1.5 text-[11px] text-muted-foreground hover:text-white transition-colors"
-                      >
-                        {showAllVideo ? (
-                          <ChevronUp className="w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="w-3 h-3" />
-                        )}
-                        {showAllVideo ? "Show less" : `+${videoFormats.length - 4} more qualities`}
-                      </button>
-                    )}
-                  </div>
+                {availableHeights.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">
+                    No compatible formats found for this video.
+                  </p>
+                ) : (
+                  availableHeights.map((h) => (
+                    <QualityButton
+                      key={h}
+                      height={h}
+                      fmt={formatMap.get(h)!}
+                      videoUrl={videoUrl}
+                      videoTitle={info.title}
+                    />
+                  ))
                 )}
-
-                {audioFormats.length > 0 && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-1.5 px-1">
-                      <Music2 className="w-3 h-3 text-violet-400" />
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                        Audio Only
-                      </span>
-                    </div>
-                    {visibleAudio.map((fmt) => (
-                      <FormatRow key={fmt.itag} fmt={fmt} url={videoUrl} title={info.title} />
-                    ))}
-                    {audioFormats.length > 2 && (
-                      <button
-                        onClick={() => setShowAllAudio((v) => !v)}
-                        className="w-full flex items-center justify-center gap-1 py-1.5 text-[11px] text-muted-foreground hover:text-white transition-colors"
-                      >
-                        {showAllAudio ? (
-                          <ChevronUp className="w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="w-3 h-3" />
-                        )}
-                        {showAllAudio ? "Show less" : `+${audioFormats.length - 2} more options`}
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                <p className="text-[10px] text-muted-foreground/50 text-center pt-1 pb-0.5">
-                  Personal use only · Temp files auto-deleted after download
+                <p className="text-[10px] text-muted-foreground/50 text-center pt-1">
+                  Downloads appear in the header · Personal use only
                 </p>
               </>
             )}

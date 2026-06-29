@@ -9,6 +9,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { CustomerAuthProvider } from "@/hooks/use-customer-auth";
 import { SellerAuthProvider } from "@/hooks/use-seller-auth";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
+import { DownloadManagerProvider } from "@/hooks/use-download-manager";
 
 // Public Pages — lazy loaded (each becomes its own JS chunk)
 const PublicHome = lazy(() =>
@@ -197,9 +198,11 @@ function App() {
           <AuthProvider>
             <CustomerAuthProvider>
               <SellerAuthProvider>
-                <MaintenanceGate>
-                  <Router />
-                </MaintenanceGate>
+                <DownloadManagerProvider>
+                  <MaintenanceGate>
+                    <Router />
+                  </MaintenanceGate>
+                </DownloadManagerProvider>
               </SellerAuthProvider>
             </CustomerAuthProvider>
           </AuthProvider>

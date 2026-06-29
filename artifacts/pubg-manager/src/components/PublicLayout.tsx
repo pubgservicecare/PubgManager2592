@@ -26,6 +26,7 @@ import { useCustomerAuth } from "@/hooks/use-customer-auth";
 import { useSellerAuth } from "@/hooks/use-seller-auth";
 import { useState, useEffect } from "react";
 import { NotificationBell } from "@/components/NotificationBell";
+import { DownloadManager } from "@/components/DownloadManager";
 import { HelpCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
@@ -198,6 +199,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
             {customer ? (
               <>
                 <NotificationBell />
+                <DownloadManager />
                 <Link href="/my">
                   <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all cursor-pointer font-semibold text-sm">
                     <MessageSquare className="w-4 h-4" />
@@ -251,6 +253,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
           {/* Mobile: avatar/cta + hamburger */}
           <div className="md:hidden flex items-center gap-2">
             {customer && <NotificationBell />}
+            <DownloadManager />
             {!customer && !seller && (
               <Link href="/login">
                 <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs transition-all">
