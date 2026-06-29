@@ -57,7 +57,8 @@ attached_assets/
 # Local file uploads — use object storage, not git
 artifacts/api-server/uploads/
 
-# YouTube cookies — decoded from YOUTUBE_COOKIES_B64 at runtime, never committed
+# YouTube cookies — never store in the repository.
+# Use a Render Secret File + YOUTUBE_COOKIES_FILE env var instead.
 cookies.txt
 yt-cookies*.txt
 **/yt-cookies*.txt

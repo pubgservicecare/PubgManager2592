@@ -7,110 +7,95 @@ import {
   statSync,
   unlinkSync,
   chmodSync,
-  writeFileSync,
+  createWriteStream,
 } from "fs";
 import { join } from "path";
 import { homedir, tmpdir } from "os";
 import { randomBytes } from "crypto";
 import { pipeline } from "stream/promises";
-import { createWriteStream } from "fs";
 import https from "https";
 import { logger } from "./logger";
 
 const execFileAsync = promisify(execFile);
-
-// ── Binary resolution ──────────────────────────────────────────────────────
 const HOME = homedir();
 
-// Writable cache directory — works on Render without root permissions.
+// ── yt-dlp binary resolution ───────────────────────────────────────────────
+//
+// Checked in order; first match wins.
+// If none exist, the binary is auto-downloaded to .cache/yt-dlp on first use.
+
 const CACHE_BIN = join(process.cwd(), ".cache", "yt-dlp");
 
-// Known system locations (may or may not exist depending on the host)
 const SYSTEM_CANDIDATES = [
   join(HOME, ".local/bin/yt-dlp"),
   "/usr/local/bin/yt-dlp",
   "/usr/bin/yt-dlp",
 ];
 
-let YT_DLP = SYSTEM_CANDIDATES.find((p) => existsSync(p)) ?? "";
+let YT_DLP: string = SYSTEM_CANDIDATES.find((p) => existsSync(p)) ?? "";
 
 const YT_DLP_URL =
   "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
 
-// ── Cookie support ─────────────────────────────────────────────────────────
+// ── Cookie authentication ──────────────────────────────────────────────────
 //
-// Resolution order (first match wins):
+// Production setup (Render):
+//   1. In your Render dashboard go to Settings → Secret Files.
+//   2. Create a secret file at /etc/secrets/youtube-cookies.txt and paste
+//      your Netscape-format cookies.txt content.
+//   3. Add an environment variable:
+//        YOUTUBE_COOKIES_FILE=/etc/secrets/youtube-cookies.txt
 //
-//   1. .cache/yt-cookies.txt  — file uploaded directly into the project.
-//      Lives in a gitignored directory; never committed.
+// The server validates the file on startup and passes it to every yt-dlp
+// invocation via --cookies.  Cookie contents are never logged.
 //
-//   2. YOUTUBE_COOKIES_B64    — env var containing a base64-encoded
-//      Netscape cookies.txt. Decoded to a secure tmp file at startup.
-//      Useful for Render / other hosts where you can't ship a local file.
-//
-//   3. No cookies             — yt-dlp runs unauthenticated.  YouTube may
-//      block requests from data-centre IPs in this mode.
+// If the variable is absent or the file does not exist, yt-dlp runs without
+// authentication and callers receive a clear HTTP 403 when YouTube requires
+// sign-in.
 
 let COOKIES_FILE: string | null = null;
 
-// Resolve workspace root dynamically.
-// The API server's cwd is artifacts/api-server; go up two levels to reach
-// the monorepo root where .cache/ lives.
-const WORKSPACE_ROOT = join(process.cwd(), "..", "..");
-
-// Candidate paths searched in order for a pre-existing cookies file.
-const LOCAL_COOKIE_CANDIDATES = [
-  join(WORKSPACE_ROOT, ".cache", "yt-cookies.txt"), // monorepo root .cache/
-  join(process.cwd(), ".cache", "yt-cookies.txt"),  // api-server local .cache/
-  join(HOME, ".cache", "yt-cookies.txt"),            // home dir fallback
-];
-
 function initCookies(): void {
-  // 1. Look for a local cookies file first
-  for (const candidate of LOCAL_COOKIE_CANDIDATES) {
-    if (existsSync(candidate)) {
-      try {
-        chmodSync(candidate, 0o600);
-      } catch {
-        // best-effort — may fail on read-only mounts
-      }
-      COOKIES_FILE = candidate;
-      logger.info({ cookiesFile: candidate }, "yt-dlp: cookies loaded from local file");
-      return;
-    }
+  const filePath = process.env.YOUTUBE_COOKIES_FILE;
+
+  if (!filePath) {
+    logger.info("yt-dlp: YOUTUBE_COOKIES_FILE not set — running without cookies");
+    return;
   }
 
-  // 2. Fall back to base64 env var (Render / other cloud hosts)
-  const raw = process.env.YOUTUBE_COOKIES_B64;
-  if (!raw) {
-    logger.info("yt-dlp: no cookies found — running without authentication");
+  if (!existsSync(filePath)) {
+    logger.warn(
+      { path: filePath },
+      "yt-dlp: YOUTUBE_COOKIES_FILE points to a missing file — running without cookies",
+    );
     return;
   }
 
   try {
-    const decoded = Buffer.from(raw, "base64").toString("utf8");
-    const dest = join(tmpdir(), `yt-cookies-${randomBytes(6).toString("hex")}.txt`);
-    writeFileSync(dest, decoded, { encoding: "utf8", mode: 0o600 });
-    COOKIES_FILE = dest;
-    logger.info({ cookiesFile: dest }, "yt-dlp: cookies loaded from YOUTUBE_COOKIES_B64");
-  } catch (err) {
-    logger.error({ err }, "yt-dlp: failed to write cookies from env var — continuing without cookies");
+    // Tighten permissions in case the file was created with looser defaults.
+    chmodSync(filePath, 0o600);
+  } catch {
+    // Read-only mount (e.g. Render secret files) — acceptable, continue.
   }
+
+  COOKIES_FILE = filePath;
+  // Log only confirmation — never log path, size, or any cookie content.
+  logger.info("YouTube cookies loaded.");
 }
 
-// Run once at module load time so the cookie path is ready before the first request.
+// Run once at module load so cookies are ready before the first request.
 initCookies();
 
-// ── Auto-download at first use ─────────────────────────────────────────────
+// ── yt-dlp auto-download ───────────────────────────────────────────────────
 //
-// Downloads the yt-dlp binary into a writable application directory the first
-// time it is needed, then caches it for all subsequent calls.
+// If the binary is not found on the host, it is fetched from the official
+// GitHub release and cached in .cache/yt-dlp (gitignored).  Only one
+// concurrent download is allowed.
 
 let downloadPromise: Promise<string> | null = null;
 
 async function ensureYtDlp(): Promise<string> {
   if (YT_DLP && existsSync(YT_DLP)) return YT_DLP;
-
   if (existsSync(CACHE_BIN)) {
     YT_DLP = CACHE_BIN;
     return YT_DLP;
@@ -118,19 +103,15 @@ async function ensureYtDlp(): Promise<string> {
 
   if (!downloadPromise) {
     downloadPromise = (async () => {
-      const cacheDir = join(process.cwd(), ".cache");
-      mkdirSync(cacheDir, { recursive: true });
-
-      const tmpPath = CACHE_BIN + ".tmp";
-      logger.info("yt-dlp: binary not found — downloading from GitHub releases…");
-      await downloadFile(YT_DLP_URL, tmpPath);
-      chmodSync(tmpPath, 0o755);
-
-      const fs = await import("fs");
-      fs.renameSync(tmpPath, CACHE_BIN);
-
+      mkdirSync(join(process.cwd(), ".cache"), { recursive: true });
+      const tmp = CACHE_BIN + ".tmp";
+      logger.info("yt-dlp: binary not found — downloading…");
+      await downloadFile(YT_DLP_URL, tmp);
+      chmodSync(tmp, 0o755);
+      const { renameSync } = await import("fs");
+      renameSync(tmp, CACHE_BIN);
       YT_DLP = CACHE_BIN;
-      logger.info({ bin: CACHE_BIN }, "yt-dlp: binary downloaded and cached");
+      logger.info({ bin: CACHE_BIN }, "yt-dlp: binary ready");
       return YT_DLP;
     })().finally(() => {
       downloadPromise = null;
@@ -155,11 +136,10 @@ function downloadFile(url: string, dest: string): Promise<void> {
           }
           if (res.statusCode !== 200) {
             return reject(
-              new Error(`yt-dlp download failed with HTTP ${res.statusCode}`),
+              new Error(`yt-dlp download failed: HTTP ${res.statusCode}`),
             );
           }
-          const out = createWriteStream(dest);
-          pipeline(res, out).then(resolve).catch(reject);
+          pipeline(res, createWriteStream(dest)).then(resolve).catch(reject);
         })
         .on("error", reject);
     };
@@ -167,7 +147,7 @@ function downloadFile(url: string, dest: string): Promise<void> {
   });
 }
 
-// ── Shared env for all yt-dlp spawns ──────────────────────────────────────
+// ── Shared environment for spawned yt-dlp processes ───────────────────────
 const YT_ENV: NodeJS.ProcessEnv = {
   ...process.env,
   PATH: `${join(process.cwd(), ".cache")}:${join(HOME, ".local/bin")}:/usr/local/bin:/usr/bin:/bin:${process.env.PATH ?? ""}`,
@@ -225,24 +205,58 @@ export function isValidYoutubeUrl(url: string): boolean {
 
 function findTempFile(dir: string, prefix: string): string | null {
   try {
-    const files = readdirSync(dir);
-    const match = files.find((f) => f.startsWith(prefix));
+    const match = readdirSync(dir).find((f) => f.startsWith(prefix));
     return match ? join(dir, match) : null;
   } catch {
     return null;
   }
 }
 
-/** Returns true when the stderr indicates YouTube requires a login / bot check. */
-function isLoginRequired(stderr: string): boolean {
-  return (
+/**
+ * Classify a yt-dlp stderr string into one of three auth-related categories,
+ * or null if the error is unrelated to authentication.
+ */
+export type AuthErrorKind =
+  | "bot_check"      // "Sign in to confirm you're not a bot"
+  | "login_required" // video requires a signed-in account
+  | "cookies_expired"// cookies present but no longer valid
+  | null;
+
+export function classifyAuthError(stderr: string): AuthErrorKind {
+  if (
     stderr.includes("Sign in to confirm") ||
-    stderr.includes("bot") ||
-    stderr.includes("This video is available to") ||
-    stderr.includes("cookies") ||
+    stderr.includes("confirm you") ||
+    stderr.includes("bot")
+  )
+    return "bot_check";
+
+  if (
     stderr.includes("login_required") ||
-    stderr.includes("Please sign in")
-  );
+    stderr.includes("Please sign in") ||
+    stderr.includes("This video is available to") ||
+    stderr.includes("members only")
+  )
+    return "login_required";
+
+  if (
+    stderr.includes("cookies") &&
+    (stderr.includes("expired") || stderr.includes("invalid") || stderr.includes("rejected"))
+  )
+    return "cookies_expired";
+
+  return null;
+}
+
+/** Human-readable message for each auth error kind. */
+export function authErrorMessage(kind: NonNullable<AuthErrorKind>): string {
+  switch (kind) {
+    case "bot_check":
+      return "YouTube authentication is required. Server cookies are missing.";
+    case "login_required":
+      return "This video requires a signed-in YouTube account. Configure YOUTUBE_COOKIES_FILE on the server.";
+    case "cookies_expired":
+      return "The server's YouTube cookies have expired and must be refreshed. Contact the site administrator.";
+  }
 }
 
 /** Prepend --cookies flag when a cookies file is configured. */
@@ -256,30 +270,30 @@ function buildYtDlpArgs(
   type: "video" | "audio",
   outputTemplate: string,
 ): string[] {
-  let args: string[];
+  let core: string[];
 
   if (type === "audio") {
-    if (itag && itag.startsWith("mp3-")) {
+    if (itag?.startsWith("mp3-")) {
       const bitrate = itag.split("-")[1] + "K";
-      args = [
+      core = [
         "-x", "--audio-format", "mp3", "--audio-quality", bitrate,
         "-o", outputTemplate, "--no-warnings", "--no-playlist", url,
       ];
     } else {
-      args = [
+      core = [
         "-f", itag || "bestaudio",
         "-o", outputTemplate, "--no-warnings", "--no-playlist", url,
       ];
     }
   } else {
-    const formatStr = itag ? `${itag}+bestaudio/best` : "bestvideo+bestaudio/best";
-    args = [
-      "-f", formatStr, "--merge-output-format", "mp4",
+    const fmt = itag ? `${itag}+bestaudio/best` : "bestvideo+bestaudio/best";
+    core = [
+      "-f", fmt, "--merge-output-format", "mp4",
       "-o", outputTemplate, "--no-warnings", "--no-playlist", url,
     ];
   }
 
-  return withCookies(args);
+  return withCookies(core);
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────
@@ -297,13 +311,6 @@ export async function getVideoInfo(url: string): Promise<VideoInfo> {
   });
 
   const info = JSON.parse(stdout);
-
-  const title = info.title || "Unknown Title";
-  const thumbnail = info.thumbnail || "";
-  const duration: number = info.duration || 0;
-  const author: string = info.uploader || "Unknown";
-  const viewCount: number = info.view_count || 0;
-
   const allFormats: any[] = info.formats || [];
 
   // ── Video formats ──────────────────────────────────────────────────────
@@ -325,10 +332,7 @@ export async function getVideoInfo(url: string): Promise<VideoInfo> {
   }
 
   const videoFormats: VideoFormat[] = Array.from(videoMap.values())
-    .sort(
-      (a, b) =>
-        (b.height || 0) - (a.height || 0) || (b.fps || 30) - (a.fps || 30),
-    )
+    .sort((a, b) => (b.height || 0) - (a.height || 0) || (b.fps || 30) - (a.fps || 30))
     .map((f, i) => ({
       itag: f.format_id,
       qualityLabel: f.height
@@ -350,8 +354,7 @@ export async function getVideoInfo(url: string): Promise<VideoInfo> {
     .filter((f) => f.vcodec === "none" && f.acodec !== "none")
     .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
 
-  const baseAudioSize =
-    bestAudio?.filesize || bestAudio?.filesize_approx || null;
+  const duration: number = info.duration || 0;
 
   const audioFormats: VideoFormat[] = [
     {
@@ -363,7 +366,7 @@ export async function getVideoInfo(url: string): Promise<VideoInfo> {
       acodec: bestAudio?.acodec || "unknown",
       container: bestAudio?.ext || "m4a",
       type: "audio",
-      filesize: baseAudioSize,
+      filesize: bestAudio?.filesize || bestAudio?.filesize_approx || null,
       isRecommended: false,
       height: 0,
     },
@@ -410,11 +413,11 @@ export async function getVideoInfo(url: string): Promise<VideoInfo> {
 
   return {
     type: "single",
-    title,
-    thumbnail,
+    title: info.title || "Unknown Title",
+    thumbnail: info.thumbnail || "",
     duration,
-    author,
-    viewCount,
+    author: info.uploader || "Unknown",
+    viewCount: info.view_count || 0,
     formats: [...videoFormats, ...audioFormats],
   };
 }
@@ -430,33 +433,23 @@ export async function downloadToTemp(
   const prefix = `yt-dl-${tempId}`;
   const template = join(TEMP_DIR, `${prefix}.%(ext)s`);
 
-  const args = buildYtDlpArgs(url, itag, type, template);
-
-  await execFileAsync(bin, args, {
+  await execFileAsync(bin, buildYtDlpArgs(url, itag, type, template), {
     timeout: 5 * 60 * 1000,
     maxBuffer: 10 * 1024 * 1024,
     env: YT_ENV,
   });
 
   const filePath = findTempFile(TEMP_DIR, prefix);
-  if (!filePath)
-    throw new Error("Download completed but file not found on disk");
+  if (!filePath) throw new Error("Download completed but output file not found");
 
-  const filesize = statSync(filePath).size;
-  const ext =
-    filePath.split(".").pop() || (type === "audio" ? "m4a" : "mp4");
+  const ext = filePath.split(".").pop() || (type === "audio" ? "m4a" : "mp4");
 
   return {
     filePath,
     ext,
-    filesize,
+    filesize: statSync(filePath).size,
     cleanup() {
-      try {
-        unlinkSync(filePath);
-      } catch {}
+      try { unlinkSync(filePath); } catch {}
     },
   };
 }
-
-// Re-export the login-required check so routes can map it to a clean 403.
-export { isLoginRequired };

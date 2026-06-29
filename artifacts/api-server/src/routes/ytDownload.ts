@@ -4,7 +4,8 @@ import {
   isValidYoutubeUrl,
   getVideoInfo,
   downloadToTemp,
-  isLoginRequired,
+  classifyAuthError,
+  authErrorMessage,
 } from "../lib/ytDownloader";
 
 const router: IRouter = Router();
@@ -38,6 +39,7 @@ router.post("/yt-info", requireAnyAuth, async (req: Request, res: Response): Pro
   } catch (err: any) {
     const stderr: string = err.stderr ?? "";
     req.log?.error({ err, stderr: stderr.slice(0, 500) }, "yt-info error");
+
     if (err.code === "ENOENT") {
       res.status(503).json({ error: "yt-dlp is not installed on the server." });
       return;
@@ -46,12 +48,13 @@ router.post("/yt-info", requireAnyAuth, async (req: Request, res: Response): Pro
       res.status(504).json({ error: "Request timed out. Try again in a moment." });
       return;
     }
-    if (isLoginRequired(stderr)) {
-      res.status(403).json({
-        error: "YouTube is requiring a sign-in to access this video. Configure YOUTUBE_COOKIES_B64 on the server to bypass bot detection.",
-      });
+
+    const authKind = classifyAuthError(stderr);
+    if (authKind) {
+      res.status(403).json({ error: authErrorMessage(authKind) });
       return;
     }
+
     const ytErr = stderr.split("\n").find((l) => l.includes("ERROR:"))?.replace(/^.*ERROR:\s*/, "");
     res.status(500).json({
       error: ytErr
@@ -63,9 +66,9 @@ router.post("/yt-info", requireAnyAuth, async (req: Request, res: Response): Pro
 
 // ── GET /yt-download — download + stream file to browser ─────────────────
 router.get("/yt-download", requireAnyAuth, async (req: Request, res: Response): Promise<void> => {
-  const url   = req.query.url   as string | undefined;
-  const itag  = req.query.itag  as string | undefined;
-  const type  = (req.query.type as string) === "audio" ? "audio" : "video";
+  const url  = req.query.url  as string | undefined;
+  const itag = req.query.itag as string | undefined;
+  const type = (req.query.type as string) === "audio" ? "audio" : "video";
 
   if (!url) {
     res.status(400).json({ error: "URL parameter is required." });
@@ -89,9 +92,7 @@ router.get("/yt-download", requireAnyAuth, async (req: Request, res: Response): 
         ? ext === "mp3" ? "audio/mpeg" : ext === "webm" ? "audio/webm" : "audio/mp4"
         : "video/mp4";
 
-    const safeFilename = `download.${ext}`;
-
-    res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="download.${ext}"`);
     res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Length", filesize.toString());
     res.setHeader("Cache-Control", "no-store");
@@ -124,13 +125,13 @@ router.get("/yt-download", requireAnyAuth, async (req: Request, res: Response): 
       res.status(504).json({ error: "Download timed out. The video may be too large." });
       return;
     }
-    const dlStderr: string = err.stderr ?? "";
-    if (isLoginRequired(dlStderr)) {
-      res.status(403).json({
-        error: "YouTube is requiring a sign-in to download this video. Configure YOUTUBE_COOKIES_B64 on the server to bypass bot detection.",
-      });
+
+    const authKind = classifyAuthError(err.stderr ?? "");
+    if (authKind) {
+      res.status(403).json({ error: authErrorMessage(authKind) });
       return;
     }
+
     res.status(500).json({ error: "Download failed. The video may be unavailable or region-locked." });
   }
 });
