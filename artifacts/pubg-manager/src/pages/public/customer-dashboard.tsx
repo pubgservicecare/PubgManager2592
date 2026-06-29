@@ -28,7 +28,6 @@ import { Link } from "wouter";
 import { formatCurrency } from "@/lib/helpers";
 import { getRecentlyViewed } from "@/lib/recently-viewed";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { YoutubeDownloader } from "@/components/YoutubeDownloader";
 
 interface ChatStatus {
   sessionId: string;
@@ -455,8 +454,6 @@ export function CustomerDashboard() {
           </div>
         </div>
 
-        {/* YouTube Downloader */}
-        <YoutubeDownloader />
       </div>
 
       <ConfirmDialog

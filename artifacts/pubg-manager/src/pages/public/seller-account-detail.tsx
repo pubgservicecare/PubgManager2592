@@ -1,4 +1,5 @@
 import { PublicLayout } from "@/components/PublicLayout";
+import { YoutubeVideoDownloadButton } from "@/components/YoutubeVideoDownloadButton";
 import { useRoute, Link, useLocation } from "wouter";
 import { formatCurrency, formatDateTime } from "@/lib/helpers";
 import {
@@ -365,6 +366,9 @@ export function SellerAccountDetail() {
               compact
             >
               <VideoPlayer url={account.videoUrl || ""} />
+              {account.videoUrl && (account.videoUrl.includes("youtube.com") || account.videoUrl.includes("youtu.be")) && (
+                <YoutubeVideoDownloadButton videoUrl={account.videoUrl} />
+              )}
             </SectionCard>
 
             {/* Thumbnail */}

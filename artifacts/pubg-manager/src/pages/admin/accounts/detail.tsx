@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
+import { YoutubeVideoDownloadButton } from "@/components/YoutubeVideoDownloadButton";
 import { Modal } from "@/components/ui/modal";
 import { 
   useGetAccount, useDeleteAccount, useSellAccount, 
@@ -206,11 +207,16 @@ export function AdminAccountDetail() {
             <div>
               <h3 className="text-sm font-bold text-muted-foreground uppercase mb-2">Showcase Video</h3>
               {account.videoUrl ? (
-                <div className="aspect-video bg-black rounded-xl overflow-hidden border border-border">
-                  {account.videoUrl.includes("youtu") ? (
-                    <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${account.videoUrl.split("v=")[1]?.split("&")[0] || account.videoUrl.split("youtu.be/")[1]?.split("?")[0]}`} />
-                  ) : (
-                    <video className="w-full h-full object-contain" src={account.videoUrl} controls />
+                <div>
+                  <div className="aspect-video bg-black rounded-xl overflow-hidden border border-border">
+                    {account.videoUrl.includes("youtu") ? (
+                      <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${account.videoUrl.split("v=")[1]?.split("&")[0] || account.videoUrl.split("youtu.be/")[1]?.split("?")[0]}`} />
+                    ) : (
+                      <video className="w-full h-full object-contain" src={account.videoUrl} controls />
+                    )}
+                  </div>
+                  {account.videoUrl.includes("youtu") && (
+                    <YoutubeVideoDownloadButton videoUrl={account.videoUrl} />
                   )}
                 </div>
               ) : (

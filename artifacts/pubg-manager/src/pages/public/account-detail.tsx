@@ -1,4 +1,5 @@
 import { PublicLayout } from "@/components/PublicLayout";
+import { YoutubeVideoDownloadButton } from "@/components/YoutubeVideoDownloadButton";
 import { useGetAccount, useGetAccountBySlug, useGetSettings, useListAccounts } from "@workspace/api-client-react";
 import { useRoute, useLocation, Link } from "wouter";
 import { formatCurrency } from "@/lib/helpers";
@@ -461,7 +462,12 @@ export function PublicAccountDetail() {
 
               {/* ── Media: Video ── */}
               {account.videoUrl && (
-                <VideoSection url={account.videoUrl} />
+                <>
+                  <VideoSection url={account.videoUrl} />
+                  {(account.videoUrl.includes("youtube.com") || account.videoUrl.includes("youtu.be")) && (
+                    <YoutubeVideoDownloadButton videoUrl={account.videoUrl} />
+                  )}
+                </>
               )}
 
               {/* No media placeholder */}

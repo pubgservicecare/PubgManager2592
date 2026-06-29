@@ -1,5 +1,4 @@
 import { Link } from "wouter";
-import { YoutubeDownloader } from "@/components/YoutubeDownloader";
 import { AdminLayout } from "@/components/AdminLayout";
 import { useGetDashboard } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
@@ -342,10 +341,6 @@ export function AdminDashboard() {
             />
           </div>
         </div>
-      </div>
-      {/* YouTube Downloader */}
-      <div className="mt-8">
-        <YoutubeDownloader />
       </div>
     </AdminLayout>
   );

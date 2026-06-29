@@ -33,7 +33,6 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { formatDateTime, formatCurrency } from "@/lib/helpers";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { YoutubeDownloader } from "@/components/YoutubeDownloader";
 
 interface SellerStats {
   totalListings: number;
@@ -299,11 +298,6 @@ export function SellerDashboard() {
             )}
           </div>
         </div>
-      </div>
-
-      {/* YouTube Downloader */}
-      <div className="w-full max-w-2xl mx-auto px-3 pb-4">
-        <YoutubeDownloader />
       </div>
 
       <ConfirmDialog
