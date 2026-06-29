@@ -1,27 +1,110 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { existsSync, readdirSync, mkdirSync, statSync, unlinkSync } from "fs";
+import { existsSync, readdirSync, mkdirSync, statSync, unlinkSync, chmodSync } from "fs";
 import { join } from "path";
 import { homedir, tmpdir } from "os";
 import { randomBytes } from "crypto";
+import { pipeline } from "stream/promises";
+import { createWriteStream } from "fs";
+import https from "https";
 
 const execFileAsync = promisify(execFile);
 
 // ── Binary resolution ──────────────────────────────────────────────────────
 const HOME = homedir();
-const YT_DLP_CANDIDATES = [
+
+// Writable cache directory — works on Render and any other host without root.
+// Priority: project-local .cache/yt-dlp → home .cache/yt-dlp → /tmp/yt-dlp
+const CACHE_CANDIDATES = [
+  join(process.cwd(), ".cache", "yt-dlp"),
+  join(HOME, ".cache", "yt-dlp"),
+  join(tmpdir(), "yt-dlp"),
+];
+const CACHE_BIN = CACHE_CANDIDATES[0]!;
+
+// Known system locations (may or may not exist depending on the host)
+const SYSTEM_CANDIDATES = [
   join(HOME, ".local/bin/yt-dlp"),
   "/usr/local/bin/yt-dlp",
   "/usr/bin/yt-dlp",
 ];
 
-const YT_DLP: string =
-  YT_DLP_CANDIDATES.find((p) => existsSync(p)) ?? "yt-dlp";
+// YT_DLP_BIN is resolved once at module load, then potentially updated after
+// auto-download. We use a mutable reference so the rest of the module always
+// reads the current value.
+let YT_DLP = SYSTEM_CANDIDATES.find((p) => existsSync(p)) ?? "";
 
-// Always inject the local bin dir into PATH so yt-dlp is found even as "yt-dlp"
+const YT_DLP_URL =
+  "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
+
+// ── Auto-download at first use ────────────────────────────────────────────
+//
+// Downloads the yt-dlp binary into a writable application directory the first
+// time it is needed, then caches it for all subsequent calls within the same
+// process lifetime (and across restarts, since the file persists on disk).
+//
+// This avoids the need for root permissions or build-time installation.
+
+let downloadPromise: Promise<string> | null = null;
+
+async function ensureYtDlp(): Promise<string> {
+  // 1. Already resolved to a working binary in this process
+  if (YT_DLP && existsSync(YT_DLP)) return YT_DLP;
+
+  // 2. Cached binary on disk from a previous run
+  if (existsSync(CACHE_BIN)) {
+    YT_DLP = CACHE_BIN;
+    return YT_DLP;
+  }
+
+  // 3. Only one download at a time (guard against concurrent first-use)
+  if (!downloadPromise) {
+    downloadPromise = (async () => {
+      const cacheDir = join(process.cwd(), ".cache");
+      mkdirSync(cacheDir, { recursive: true });
+
+      const tmpPath = CACHE_BIN + ".tmp";
+      await downloadFile(YT_DLP_URL, tmpPath);
+      chmodSync(tmpPath, 0o755);
+
+      // Atomic rename — avoids a partially written binary being used
+      const fs = await import("fs");
+      fs.renameSync(tmpPath, CACHE_BIN);
+
+      YT_DLP = CACHE_BIN;
+      return YT_DLP;
+    })().finally(() => {
+      downloadPromise = null;
+    });
+  }
+
+  return downloadPromise;
+}
+
+function downloadFile(url: string, dest: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const follow = (u: string) => {
+      https
+        .get(u, (res) => {
+          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            return follow(res.headers.location);
+          }
+          if (res.statusCode !== 200) {
+            return reject(new Error(`yt-dlp download failed with HTTP ${res.statusCode}`));
+          }
+          const out = createWriteStream(dest);
+          pipeline(res, out).then(resolve).catch(reject);
+        })
+        .on("error", reject);
+    };
+    follow(url);
+  });
+}
+
+// Always inject the cache dir into PATH so spawned processes can also find it
 const YT_ENV: NodeJS.ProcessEnv = {
   ...process.env,
-  PATH: `${join(HOME, ".local/bin")}:/usr/local/bin:/usr/bin:/bin:${process.env.PATH ?? ""}`,
+  PATH: `${join(process.cwd(), ".cache")}:${join(HOME, ".local/bin")}:/usr/local/bin:/usr/bin:/bin:${process.env.PATH ?? ""}`,
 };
 
 export const TEMP_DIR = join(tmpdir(), "yt-downloads");
@@ -112,8 +195,10 @@ function buildYtDlpArgs(
 
 // ── Public API ─────────────────────────────────────────────────────────────
 export async function getVideoInfo(url: string): Promise<VideoInfo> {
+  const bin = await ensureYtDlp();
+
   const { stdout } = await execFileAsync(
-    YT_DLP,
+    bin,
     ["--dump-single-json", "--flat-playlist", "--no-warnings", "--no-playlist", url],
     { maxBuffer: 20 * 1024 * 1024, timeout: 30_000, env: YT_ENV }
   );
@@ -240,13 +325,15 @@ export async function downloadToTemp(
   itag: string | undefined,
   type: "video" | "audio"
 ): Promise<DownloadResult> {
+  const bin = await ensureYtDlp();
+
   const tempId = randomBytes(8).toString("hex");
   const prefix = `yt-dl-${tempId}`;
   const template = join(TEMP_DIR, `${prefix}.%(ext)s`);
 
   const args = buildYtDlpArgs(url, itag, type, template);
 
-  await execFileAsync(YT_DLP, args, {
+  await execFileAsync(bin, args, {
     timeout: 5 * 60 * 1000,
     maxBuffer: 10 * 1024 * 1024,
     env: YT_ENV,
