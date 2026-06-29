@@ -1,6 +1,6 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { readdirSync, mkdirSync, statSync, unlinkSync } from "fs";
+import { existsSync, readdirSync, mkdirSync, statSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir, tmpdir } from "os";
 import { randomBytes } from "crypto";
@@ -8,19 +8,21 @@ import { randomBytes } from "crypto";
 const execFileAsync = promisify(execFile);
 
 // ── Binary resolution ──────────────────────────────────────────────────────
+const HOME = homedir();
 const YT_DLP_CANDIDATES = [
-  join(homedir(), ".local/bin/yt-dlp"),
+  join(HOME, ".local/bin/yt-dlp"),
   "/usr/local/bin/yt-dlp",
   "/usr/bin/yt-dlp",
-  "yt-dlp",
 ];
 
-function resolveYtDlp(): string {
-  const { existsSync } = require("fs");
-  return YT_DLP_CANDIDATES.find((p) => existsSync(p)) ?? "yt-dlp";
-}
+const YT_DLP: string =
+  YT_DLP_CANDIDATES.find((p) => existsSync(p)) ?? "yt-dlp";
 
-const YT_DLP = resolveYtDlp();
+// Always inject the local bin dir into PATH so yt-dlp is found even as "yt-dlp"
+const YT_ENV: NodeJS.ProcessEnv = {
+  ...process.env,
+  PATH: `${join(HOME, ".local/bin")}:/usr/local/bin:/usr/bin:/bin:${process.env.PATH ?? ""}`,
+};
 
 export const TEMP_DIR = join(tmpdir(), "yt-downloads");
 mkdirSync(TEMP_DIR, { recursive: true });
@@ -113,7 +115,7 @@ export async function getVideoInfo(url: string): Promise<VideoInfo> {
   const { stdout } = await execFileAsync(
     YT_DLP,
     ["--dump-single-json", "--flat-playlist", "--no-warnings", "--no-playlist", url],
-    { maxBuffer: 20 * 1024 * 1024, timeout: 30_000 }
+    { maxBuffer: 20 * 1024 * 1024, timeout: 30_000, env: YT_ENV }
   );
 
   const info = JSON.parse(stdout);
@@ -247,6 +249,7 @@ export async function downloadToTemp(
   await execFileAsync(YT_DLP, args, {
     timeout: 5 * 60 * 1000,
     maxBuffer: 10 * 1024 * 1024,
+    env: YT_ENV,
   });
 
   const filePath = findTempFile(TEMP_DIR, prefix);

@@ -35,16 +35,22 @@ router.post("/yt-info", requireAnyAuth, async (req: Request, res: Response): Pro
     const info = await getVideoInfo(url);
     res.json(info);
   } catch (err: any) {
-    req.log?.error({ err }, "yt-info error");
+    const stderr: string = err.stderr ?? "";
+    req.log?.error({ err, stderr: stderr.slice(0, 500) }, "yt-info error");
     if (err.code === "ENOENT") {
-      res.status(503).json({ error: "yt-dlp is not available on the server." });
+      res.status(503).json({ error: "yt-dlp is not installed on the server." });
       return;
     }
     if (err.killed || err.code === "ETIMEDOUT") {
-      res.status(504).json({ error: "Request timed out. Try again with a different URL." });
+      res.status(504).json({ error: "Request timed out. Try again in a moment." });
       return;
     }
-    res.status(500).json({ error: "Failed to fetch video information. The video may be private or unavailable." });
+    const ytErr = stderr.split("\n").find((l) => l.includes("ERROR:"))?.replace(/^.*ERROR:\s*/, "");
+    res.status(500).json({
+      error: ytErr
+        ? `yt-dlp: ${ytErr}`
+        : "Failed to fetch video info. The video may be private, unavailable, or region-locked.",
+    });
   }
 });
 
