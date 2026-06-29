@@ -39,19 +39,51 @@ const YT_DLP_URL =
 
 // ── Cookie support ─────────────────────────────────────────────────────────
 //
-// Set YOUTUBE_COOKIES_B64 to a base64-encoded Netscape cookies.txt file.
-// On startup the value is decoded and written to a secure temp file.
-// Every yt-dlp invocation then receives --cookies <path>.
+// Resolution order (first match wins):
 //
-// If the variable is absent the downloader works without cookies (but YouTube
-// may rate-limit or block requests from data-centre IPs).
+//   1. .cache/yt-cookies.txt  — file uploaded directly into the project.
+//      Lives in a gitignored directory; never committed.
+//
+//   2. YOUTUBE_COOKIES_B64    — env var containing a base64-encoded
+//      Netscape cookies.txt. Decoded to a secure tmp file at startup.
+//      Useful for Render / other hosts where you can't ship a local file.
+//
+//   3. No cookies             — yt-dlp runs unauthenticated.  YouTube may
+//      block requests from data-centre IPs in this mode.
 
 let COOKIES_FILE: string | null = null;
 
+// Resolve workspace root dynamically.
+// The API server's cwd is artifacts/api-server; go up two levels to reach
+// the monorepo root where .cache/ lives.
+const WORKSPACE_ROOT = join(process.cwd(), "..", "..");
+
+// Candidate paths searched in order for a pre-existing cookies file.
+const LOCAL_COOKIE_CANDIDATES = [
+  join(WORKSPACE_ROOT, ".cache", "yt-cookies.txt"), // monorepo root .cache/
+  join(process.cwd(), ".cache", "yt-cookies.txt"),  // api-server local .cache/
+  join(HOME, ".cache", "yt-cookies.txt"),            // home dir fallback
+];
+
 function initCookies(): void {
+  // 1. Look for a local cookies file first
+  for (const candidate of LOCAL_COOKIE_CANDIDATES) {
+    if (existsSync(candidate)) {
+      try {
+        chmodSync(candidate, 0o600);
+      } catch {
+        // best-effort — may fail on read-only mounts
+      }
+      COOKIES_FILE = candidate;
+      logger.info({ cookiesFile: candidate }, "yt-dlp: cookies loaded from local file");
+      return;
+    }
+  }
+
+  // 2. Fall back to base64 env var (Render / other cloud hosts)
   const raw = process.env.YOUTUBE_COOKIES_B64;
   if (!raw) {
-    logger.info("yt-dlp: YOUTUBE_COOKIES_B64 not set — running without cookies");
+    logger.info("yt-dlp: no cookies found — running without authentication");
     return;
   }
 
@@ -62,11 +94,11 @@ function initCookies(): void {
     COOKIES_FILE = dest;
     logger.info({ cookiesFile: dest }, "yt-dlp: cookies loaded from YOUTUBE_COOKIES_B64");
   } catch (err) {
-    logger.error({ err }, "yt-dlp: failed to write cookies file — continuing without cookies");
+    logger.error({ err }, "yt-dlp: failed to write cookies from env var — continuing without cookies");
   }
 }
 
-// Run once at module load time so the file is ready before the first request.
+// Run once at module load time so the cookie path is ready before the first request.
 initCookies();
 
 // ── Auto-download at first use ─────────────────────────────────────────────
