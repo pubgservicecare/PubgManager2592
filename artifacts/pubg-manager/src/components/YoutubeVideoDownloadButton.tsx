@@ -61,7 +61,13 @@ function FormatRow({ fmt, url, title }: { fmt: VideoFormat; url: string; title: 
       const res = await fetch(`/api/yt-download?${params}`, { credentials: "include" });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error((body as any).error || `Error ${res.status}`);
+        console.error("[yt-download] error response", { status: res.status, body });
+        if (res.status === 403) {
+          throw new Error(
+            "Server YouTube authentication failed. The server cookies are missing, expired, or invalid.",
+          );
+        }
+        throw new Error((body as any).error || `Server error ${res.status}`);
       }
 
       const contentLength = Number(res.headers.get("Content-Length") ?? 0);
@@ -229,7 +235,15 @@ export function YoutubeVideoDownloadButton({ videoUrl }: { videoUrl: string }) {
         body: JSON.stringify({ url: videoUrl }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+      console.error("[yt-info] response", { status: res.status, body: data });
+      if (!res.ok) {
+        if (res.status === 403) {
+          throw new Error(
+            "Server YouTube authentication failed. The server cookies are missing, expired, or invalid.",
+          );
+        }
+        throw new Error(data.error || `Server error ${res.status}`);
+      }
       setInfo(data as VideoInfo);
       setState("idle");
     } catch (e: any) {
