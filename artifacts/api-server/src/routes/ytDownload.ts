@@ -4,6 +4,7 @@ import {
   isValidYoutubeUrl,
   getVideoInfo,
   downloadToTemp,
+  isLoginRequired,
 } from "../lib/ytDownloader";
 
 const router: IRouter = Router();
@@ -43,6 +44,12 @@ router.post("/yt-info", requireAnyAuth, async (req: Request, res: Response): Pro
     }
     if (err.killed || err.code === "ETIMEDOUT") {
       res.status(504).json({ error: "Request timed out. Try again in a moment." });
+      return;
+    }
+    if (isLoginRequired(stderr)) {
+      res.status(403).json({
+        error: "YouTube is requiring a sign-in to access this video. Configure YOUTUBE_COOKIES_B64 on the server to bypass bot detection.",
+      });
       return;
     }
     const ytErr = stderr.split("\n").find((l) => l.includes("ERROR:"))?.replace(/^.*ERROR:\s*/, "");
@@ -115,6 +122,13 @@ router.get("/yt-download", requireAnyAuth, async (req: Request, res: Response): 
     }
     if (err.killed || err.code === "ETIMEDOUT") {
       res.status(504).json({ error: "Download timed out. The video may be too large." });
+      return;
+    }
+    const dlStderr: string = err.stderr ?? "";
+    if (isLoginRequired(dlStderr)) {
+      res.status(403).json({
+        error: "YouTube is requiring a sign-in to download this video. Configure YOUTUBE_COOKIES_B64 on the server to bypass bot detection.",
+      });
       return;
     }
     res.status(500).json({ error: "Download failed. The video may be unavailable or region-locked." });
