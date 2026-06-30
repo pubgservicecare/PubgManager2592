@@ -5,8 +5,9 @@ import {
   getVideoInfo,
   downloadToTemp,
   classifyAuthError,
-  authErrorMessage,
 } from "../lib/ytDownloader";
+
+const UNAVAILABLE = "Video download is temporarily unavailable. Please try again later.";
 
 const router: IRouter = Router();
 
@@ -51,15 +52,13 @@ router.post("/yt-info", requireAnyAuth, async (req: Request, res: Response): Pro
 
     const authKind = classifyAuthError(stderr);
     if (authKind) {
-      res.status(403).json({ error: authErrorMessage(authKind), needsCookies: true, authKind });
+      req.log?.warn({ authKind }, "yt-info: YouTube auth required");
+      res.status(503).json({ error: UNAVAILABLE });
       return;
     }
 
-    const ytErr = stderr.split("\n").find((l) => l.includes("ERROR:"))?.replace(/^.*ERROR:\s*/, "");
     res.status(500).json({
-      error: ytErr
-        ? `yt-dlp: ${ytErr}`
-        : "Failed to fetch video info. The video may be private, unavailable, or region-locked.",
+      error: "Failed to fetch video info. The video may be private, unavailable, or region-locked.",
     });
   }
 });
@@ -128,7 +127,8 @@ router.get("/yt-download", requireAnyAuth, async (req: Request, res: Response): 
 
     const authKind = classifyAuthError(err.stderr ?? "");
     if (authKind) {
-      res.status(403).json({ error: authErrorMessage(authKind), needsCookies: true, authKind });
+      req.log?.warn({ authKind }, "yt-download: YouTube auth required");
+      res.status(503).json({ error: UNAVAILABLE });
       return;
     }
 

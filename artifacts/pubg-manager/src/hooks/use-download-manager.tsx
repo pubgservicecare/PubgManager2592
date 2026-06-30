@@ -100,10 +100,7 @@ export function DownloadManagerProvider({ children }: { children: ReactNode }) {
 
           if (!res.ok) {
             const body = await res.json().catch(() => ({}));
-            let msg = (body as any).error ?? `Server error ${res.status}`;
-            if (res.status === 403)
-              msg =
-                "Server YouTube authentication failed. The server cookies are missing, expired, or invalid.";
+            const msg = (body as any).error ?? "Video download is temporarily unavailable. Please try again later.";
             setItem(id, { state: "error", error: msg });
             return;
           }
