@@ -51,7 +51,7 @@ router.post("/yt-info", requireAnyAuth, async (req: Request, res: Response): Pro
 
     const authKind = classifyAuthError(stderr);
     if (authKind) {
-      res.status(403).json({ error: authErrorMessage(authKind) });
+      res.status(403).json({ error: authErrorMessage(authKind), needsCookies: true, authKind });
       return;
     }
 
@@ -128,7 +128,7 @@ router.get("/yt-download", requireAnyAuth, async (req: Request, res: Response): 
 
     const authKind = classifyAuthError(err.stderr ?? "");
     if (authKind) {
-      res.status(403).json({ error: authErrorMessage(authKind) });
+      res.status(403).json({ error: authErrorMessage(authKind), needsCookies: true, authKind });
       return;
     }
 

@@ -262,6 +262,23 @@ export function authErrorMessage(kind: NonNullable<AuthErrorKind>): string {
   }
 }
 
+// ── Player-client strategy ──────────────────────────────────────────────────
+//
+// YouTube increasingly blocks plain server IPs.  We try the most permissive
+// clients first; each attempt is independent so a transient ban on one client
+// does not fail the whole request.
+//
+// ios   — works without cookies on most server IPs (tested 2025-06-30)
+// android — broader format set, good fallback
+// tv_embedded — last-resort; works even when ios is rate-limited
+//
+const PLAYER_CLIENTS: readonly string[] = ["ios", "android", "tv_embedded"];
+
+/** Return the --extractor-args string for a given client. */
+function clientArg(client: string): string {
+  return `youtube:player_client=${client}`;
+}
+
 /** Prepend --cookies flag when a cookies file is configured. */
 function withCookies(args: string[]): string[] {
   return COOKIES_FILE ? ["--cookies", COOKIES_FILE, ...args] : args;
@@ -272,7 +289,10 @@ function buildYtDlpArgs(
   itag: string | undefined,
   type: "video" | "audio",
   outputTemplate: string,
+  client: string,
 ): string[] {
+  const clientFlags = ["--extractor-args", clientArg(client)];
+
   let core: string[];
 
   if (type === "audio") {
@@ -280,38 +300,83 @@ function buildYtDlpArgs(
       const bitrate = itag.split("-")[1] + "K";
       core = [
         "-x", "--audio-format", "mp3", "--audio-quality", bitrate,
-        "-o", outputTemplate, "--no-warnings", "--no-playlist", url,
+        "-o", outputTemplate, "--no-warnings", "--no-playlist",
+        ...clientFlags, url,
       ];
     } else {
       core = [
         "-f", itag || "bestaudio",
-        "-o", outputTemplate, "--no-warnings", "--no-playlist", url,
+        "-o", outputTemplate, "--no-warnings", "--no-playlist",
+        ...clientFlags, url,
       ];
     }
   } else {
     const fmt = itag ? `${itag}+bestaudio/best` : "bestvideo+bestaudio/best";
     core = [
       "-f", fmt, "--merge-output-format", "mp4",
-      "-o", outputTemplate, "--no-warnings", "--no-playlist", url,
+      "-o", outputTemplate, "--no-warnings", "--no-playlist",
+      ...clientFlags, url,
     ];
   }
 
   return withCookies(core);
 }
 
+/**
+ * Run yt-dlp with automatic client-rotation retry.
+ *
+ * • First attempt uses `ios` (fastest, most permissive).
+ * • On auth / bot-detection failure each subsequent client is tried.
+ * • Non-auth errors (private video, network, timeout) are thrown immediately.
+ */
+async function execWithRetry(
+  bin: string,
+  buildArgs: (client: string) => string[],
+  opts: { timeout: number; maxBuffer: number },
+): Promise<string> {
+  let lastErr: any;
+
+  for (const client of PLAYER_CLIENTS) {
+    const args = buildArgs(client);
+    try {
+      const { stdout } = await execFileAsync(bin, args, { ...opts, env: YT_ENV });
+      return stdout;
+    } catch (err: any) {
+      const stderr: string = err.stderr ?? "";
+      const kind = classifyAuthError(stderr);
+
+      if (kind === "bot_check") {
+        // Retry with next client — bot check is client-specific
+        lastErr = err;
+        logger.warn({ client, stderr: stderr.slice(0, 200) }, `yt-dlp: bot check on ${client}, retrying…`);
+        continue;
+      }
+
+      // Any other error (private video, timeout, parse error, login_required,
+      // cookies_expired) is not client-specific — throw immediately.
+      throw err;
+    }
+  }
+
+  // All clients exhausted — throw the last bot-check error
+  throw lastErr;
+}
+
 // ── Public API ─────────────────────────────────────────────────────────────
 export async function getVideoInfo(url: string): Promise<VideoInfo> {
   const bin = await ensureYtDlp();
 
-  const args = withCookies([
-    "--dump-single-json", "--flat-playlist", "--no-warnings", "--no-playlist", url,
-  ]);
-
-  const { stdout } = await execFileAsync(bin, args, {
-    maxBuffer: 20 * 1024 * 1024,
-    timeout: 30_000,
-    env: YT_ENV,
-  });
+  const stdout = await execWithRetry(
+    bin,
+    (client) =>
+      withCookies([
+        "--dump-single-json", "--flat-playlist",
+        "--no-warnings", "--no-playlist",
+        "--extractor-args", clientArg(client),
+        url,
+      ]),
+    { maxBuffer: 20 * 1024 * 1024, timeout: 30_000 },
+  );
 
   const info = JSON.parse(stdout);
   const allFormats: any[] = info.formats || [];
@@ -436,11 +501,13 @@ export async function downloadToTemp(
   const prefix = `yt-dl-${tempId}`;
   const template = join(TEMP_DIR, `${prefix}.%(ext)s`);
 
-  await execFileAsync(bin, buildYtDlpArgs(url, itag, type, template), {
-    timeout: 5 * 60 * 1000,
-    maxBuffer: 10 * 1024 * 1024,
-    env: YT_ENV,
-  });
+  // execWithRetry returns stdout but for downloads we only care that
+  // the command succeeded — the output goes to the file, not stdout.
+  await execWithRetry(
+    bin,
+    (client) => buildYtDlpArgs(url, itag, type, template, client),
+    { timeout: 5 * 60 * 1000, maxBuffer: 10 * 1024 * 1024 },
+  );
 
   const filePath = findTempFile(TEMP_DIR, prefix);
   if (!filePath) throw new Error("Download completed but output file not found");

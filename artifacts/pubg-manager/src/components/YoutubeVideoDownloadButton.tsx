@@ -123,11 +123,13 @@ export function YoutubeVideoDownloadButton({ videoUrl }: { videoUrl: string }) {
   const [open, setOpen] = useState(false);
   const [fetchState, setFetchState] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState("");
+  const [needsCookies, setNeedsCookies] = useState(false);
   const [info, setInfo] = useState<VideoInfo | null>(null);
 
   const fetchInfo = async () => {
     setFetchState("loading");
     setError("");
+    setNeedsCookies(false);
     try {
       const res = await fetch("/api/yt-info", {
         method: "POST",
@@ -136,12 +138,8 @@ export function YoutubeVideoDownloadButton({ videoUrl }: { videoUrl: string }) {
         body: JSON.stringify({ url: videoUrl }),
       });
       const data = await res.json();
-      console.error("[yt-info] response", { status: res.status, body: data });
       if (!res.ok) {
-        if (res.status === 403)
-          throw new Error(
-            "Server YouTube authentication failed. The server cookies are missing, expired, or invalid.",
-          );
+        if (data.needsCookies) setNeedsCookies(true);
         throw new Error(data.error || `Server error ${res.status}`);
       }
       setInfo(data as VideoInfo);
@@ -222,16 +220,58 @@ export function YoutubeVideoDownloadButton({ videoUrl }: { videoUrl: string }) {
 
             {/* Error */}
             {fetchState === "error" && (
-              <div className="flex flex-col gap-3 p-3 rounded-xl bg-destructive/10 border border-destructive/25">
+              <div className="flex flex-col gap-2.5 p-3 rounded-xl bg-destructive/10 border border-destructive/25">
                 <div className="flex items-start gap-2 text-destructive text-xs">
                   <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                   <span>{error}</span>
                 </div>
+
+                {needsCookies && (
+                  <div className="rounded-lg bg-amber-500/10 border border-amber-500/25 p-3 space-y-2">
+                    <p className="text-[11px] font-bold text-amber-400">
+                      🍪 Render pe YouTube Cookies Setup Karein
+                    </p>
+                    <ol className="text-[10px] text-muted-foreground space-y-1.5 list-decimal list-inside leading-relaxed">
+                      <li>Chrome mein <span className="text-white font-semibold">youtube.com</span> pe login karein</li>
+                      <li>
+                        Extension install karein:{" "}
+                        <a
+                          href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-amber-400 underline font-semibold"
+                        >
+                          Get cookies.txt LOCALLY
+                        </a>
+                      </li>
+                      <li>YouTube pe jakar extension se cookies export karein <span className="text-white">(Netscape format)</span></li>
+                      <li>
+                        Render Dashboard →{" "}
+                        <span className="text-white font-semibold">Settings → Secret Files</span>
+                      </li>
+                      <li>
+                        File path:{" "}
+                        <code className="bg-black/40 px-1.5 py-0.5 rounded text-amber-300 text-[10px]">
+                          /etc/secrets/youtube-cookies.txt
+                        </code>
+                      </li>
+                      <li>
+                        Environment variable add karein:
+                        <br />
+                        <code className="bg-black/40 px-1.5 py-0.5 rounded text-amber-300 text-[10px] break-all">
+                          YOUTUBE_COOKIES_FILE=/etc/secrets/youtube-cookies.txt
+                        </code>
+                      </li>
+                      <li>Render pe <span className="text-white font-semibold">Manual Deploy</span> karein</li>
+                    </ol>
+                  </div>
+                )}
+
                 <button
                   onClick={handleRetry}
                   className="self-start text-[11px] font-bold text-primary hover:underline"
                 >
-                  Try again
+                  Dobara try karein
                 </button>
               </div>
             )}

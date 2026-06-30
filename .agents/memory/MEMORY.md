@@ -6,3 +6,4 @@
 - [Email auth system](email-auth-system.md) — OTP-based email signup/reset; customerAuth.ts is the single place for set-password and link-google; use-customer-auth.ts is .ts not .tsx so no JSX allowed.
 - [Auth hardening](auth-hardening.md) — Production auth hardening: DB rate limiter, audit logs, soft delete, deleted_at guards, unlink-google, email update flow.
 - [yt-dlp binary on Replit](yt-dlp-binary.md) — Must use yt-dlp_linux (standalone), NOT plain yt-dlp (Python zipapp — fails: python3 not in PATH on NixOS).
+- [yt-dlp YouTube auth on servers](yt-dlp-server-auth.md) — Production servers (Render) get bot-blocked; fix: player-client rotation ios→android→tv_embedded + YOUTUBE_COOKIES_FILE secret file.
