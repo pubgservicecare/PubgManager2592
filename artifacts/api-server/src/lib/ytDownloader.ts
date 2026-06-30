@@ -15,6 +15,7 @@ import { randomBytes } from "crypto";
 import { pipeline } from "stream/promises";
 import https from "https";
 import { logger } from "./logger";
+import { poTokenArgs } from "./poTokenManager";
 
 const execFileAsync = promisify(execFile);
 const HOME = homedir();
@@ -264,15 +265,16 @@ export function authErrorMessage(kind: NonNullable<AuthErrorKind>): string {
 
 // ── Player-client strategy ──────────────────────────────────────────────────
 //
-// YouTube increasingly blocks plain server IPs.  We try the most permissive
-// clients first; each attempt is independent so a transient ban on one client
-// does not fail the whole request.
+// YouTube requires PO (Proof-of-Origin) tokens on server/datacenter IPs since
+// late 2024.  Strategy (tried in order):
 //
-// ios   — works without cookies on most server IPs (tested 2025-06-30)
-// android — broader format set, good fallback
-// tv_embedded — last-resort; works even when ios is rate-limited
+//   1. web   + auto-generated PO token  ← primary (most formats, reliable)
+//   2. mweb  + auto-generated PO token  ← secondary
+//   3. ios                              ← no PO token needed on some IPs
+//   4. android                          ← broader format fallback
+//   5. tv_embedded                      ← last resort
 //
-const PLAYER_CLIENTS: readonly string[] = ["ios", "android", "tv_embedded"];
+// Tokens are generated automatically by poTokenManager (no manual setup).
 
 /** Return the --extractor-args string for a given client. */
 function clientArg(client: string): string {
@@ -290,6 +292,7 @@ function buildYtDlpArgs(
   type: "video" | "audio",
   outputTemplate: string,
   client: string,
+  extraArgs: string[] = [],
 ): string[] {
   const clientFlags = ["--extractor-args", clientArg(client)];
 
@@ -301,13 +304,13 @@ function buildYtDlpArgs(
       core = [
         "-x", "--audio-format", "mp3", "--audio-quality", bitrate,
         "-o", outputTemplate, "--no-warnings", "--no-playlist",
-        ...clientFlags, url,
+        ...clientFlags, ...extraArgs, url,
       ];
     } else {
       core = [
         "-f", itag || "bestaudio",
         "-o", outputTemplate, "--no-warnings", "--no-playlist",
-        ...clientFlags, url,
+        ...clientFlags, ...extraArgs, url,
       ];
     }
   } else {
@@ -315,7 +318,7 @@ function buildYtDlpArgs(
     core = [
       "-f", fmt, "--merge-output-format", "mp4",
       "-o", outputTemplate, "--no-warnings", "--no-playlist",
-      ...clientFlags, url,
+      ...clientFlags, ...extraArgs, url,
     ];
   }
 
@@ -323,42 +326,65 @@ function buildYtDlpArgs(
 }
 
 /**
- * Run yt-dlp with automatic client-rotation retry.
+ * Run yt-dlp with automatic PO-token + client-rotation retry.
  *
- * • First attempt uses `ios` (fastest, most permissive).
- * • On auth / bot-detection failure each subsequent client is tried.
- * • Non-auth errors (private video, network, timeout) are thrown immediately.
+ * Tries web/mweb with a fresh PO token first (handles server-IP bot checks).
+ * Falls back to ios/android/tv_embedded without PO token if needed.
+ * Non-auth errors are thrown immediately without retrying.
  */
 async function execWithRetry(
   bin: string,
-  buildArgs: (client: string) => string[],
+  buildArgs: (client: string, extra: string[]) => string[],
   opts: { timeout: number; maxBuffer: number },
 ): Promise<string> {
+  // Get PO token once for this request (cached, near-instant after first gen)
+  const poArgs = await poTokenArgs();
+
+  // Build the ordered attempt list.
+  // tv_embedded is tried first because it works on most server IPs without PO tokens.
+  // web/mweb with PO token are tried second if a token is available.
+  // ios/android/tv_embedded again as final fallbacks.
+  type Attempt = { client: string; extra: string[] };
+  const attempts: Attempt[] = [
+    { client: "tv_embedded", extra: [] },
+  ];
+
+  if (poArgs.length) {
+    attempts.push(
+      { client: "web",  extra: poArgs },
+      { client: "mweb", extra: poArgs },
+    );
+  }
+
+  attempts.push(
+    { client: "ios",     extra: [] },
+    { client: "android", extra: [] },
+  );
+
   let lastErr: any;
 
-  for (const client of PLAYER_CLIENTS) {
-    const args = buildArgs(client);
+  for (const { client, extra } of attempts) {
+    const args = buildArgs(client, extra);
     try {
       const { stdout } = await execFileAsync(bin, args, { ...opts, env: YT_ENV });
+      logger.info({ client }, "yt-dlp: success");
       return stdout;
     } catch (err: any) {
       const stderr: string = err.stderr ?? "";
       const kind = classifyAuthError(stderr);
 
-      if (kind === "bot_check") {
-        // Retry with next client — bot check is client-specific
+      if (kind !== null) {
+        // Any auth-related failure — try the next client
         lastErr = err;
-        logger.warn({ client, stderr: stderr.slice(0, 200) }, `yt-dlp: bot check on ${client}, retrying…`);
+        logger.warn({ client, kind, stderr: stderr.slice(0, 200) }, "yt-dlp: auth error, retrying with next client");
         continue;
       }
 
-      // Any other error (private video, timeout, parse error, login_required,
-      // cookies_expired) is not client-specific — throw immediately.
+      // Non-auth errors (private video, timeout, parse error) — throw immediately
       throw err;
     }
   }
 
-  // All clients exhausted — throw the last bot-check error
   throw lastErr;
 }
 
@@ -368,11 +394,12 @@ export async function getVideoInfo(url: string): Promise<VideoInfo> {
 
   const stdout = await execWithRetry(
     bin,
-    (client) =>
+    (client, extra) =>
       withCookies([
         "--dump-single-json", "--flat-playlist",
         "--no-warnings", "--no-playlist",
         "--extractor-args", clientArg(client),
+        ...extra,
         url,
       ]),
     { maxBuffer: 20 * 1024 * 1024, timeout: 30_000 },
@@ -505,7 +532,7 @@ export async function downloadToTemp(
   // the command succeeded — the output goes to the file, not stdout.
   await execWithRetry(
     bin,
-    (client) => buildYtDlpArgs(url, itag, type, template, client),
+    (client, extra) => buildYtDlpArgs(url, itag, type, template, client, extra),
     { timeout: 5 * 60 * 1000, maxBuffer: 10 * 1024 * 1024 },
   );
 
